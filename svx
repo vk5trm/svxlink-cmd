@@ -125,6 +125,7 @@ declare -A LOG_FILES=(
 
 readonly GPIO_CONF="/etc/svxlink/gpio.conf"
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
+readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -344,7 +345,7 @@ action_edit_events() {
 
     # Find all .tcl files using mapfile (more reliable)
     local tcl_files
-    mapfile -t tcl_files < <(find "$EVENTS_DIR" -name "*.tcl" -type f 2>/dev/null | sort)
+    mapfile -t tcl_files < <(find "$EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${EVENTS_DIR}"
@@ -384,7 +385,26 @@ action_edit_events() {
         return
     fi
 
-    $EDITOR "$selected_file"
+    # Check if local dir exists, create if not
+    if [[ ! -d "$LOCAL_EVENTS_DIR" ]]; then
+        mkdir -p "$LOCAL_EVENTS_DIR" || {
+            show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
+            return
+        }
+    fi
+
+    # Copy selected file to local dir
+    local filename
+    filename=$(basename "$selected_file")
+    local local_file="${LOCAL_EVENTS_DIR}/${filename}"
+    
+    if ! cp "$selected_file" "$local_file"; then
+        show_result "Error" "Failed to copy file to:\n${local_file}"
+        return
+    fi
+
+    # Edit the file in local dir
+    $EDITOR "$local_file"
 }
 
 # =============================================================================
