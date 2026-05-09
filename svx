@@ -343,35 +343,45 @@ action_edit_events() {
         return
     fi
 
-    # Find all .tcl files in events.d (main directory)
-    local main_files
-    mapfile -t main_files < <(find "$EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
+# Build final file list
+# Local overrides take precedence over main files
 
-    # Find all .tcl files in events.d/local (local overrides)
-    local local_files=()
-    if [[ -d "$LOCAL_EVENTS_DIR" ]]; then
-        mapfile -t local_files < <(find "$LOCAL_EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
-    fi
+local -a tcl_files=()
+local -A seen_files=()
 
-    # Combine the lists: main files first, then local-only files
-    local tcl_files=()
-    
-    # Add all main files
-    for file in "${main_files[@]}"; do
+# Add local files first
+if [[ -d "$LOCAL_EVENTS_DIR" ]]; then
+    while IFS= read -r -d '' file; do
+        local base
+        base=$(basename "$file")
+
         tcl_files+=("$file")
-    done
-    
-    # Add local files that don't exist in main directory
-    for local_file in "${local_files[@]}"; do
-        local basename_local
-        basename_local=$(basename "$local_file")
-        local main_file="${EVENTS_DIR}/${basename_local}"
-        
-        # If file doesn't exist in main directory, add it from local
-        if [[ ! -f "$main_file" ]]; then
-            tcl_files+=("$local_file")
-        fi
-    done
+        seen_files["$base"]=1
+    done < <(
+        find "$LOCAL_EVENTS_DIR" \
+            -maxdepth 1 \
+            -type f \
+            -name "*.tcl" \
+            -print0 | sort -z
+    )
+fi
+
+# Add main files only if not overridden locally
+while IFS= read -r -d '' file; do
+    local base
+    base=$(basename "$file")
+
+    if [[ -z "${seen_files[$base]:-}" ]]; then
+#    if [[ -z "${seen_files[$base]}" ]]; then
+        tcl_files+=("$file")
+    fi
+done < <(
+    find "$EVENTS_DIR" \
+        -maxdepth 1 \
+        -type f \
+        -name "*.tcl" \
+        -print0 | sort -z
+)
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${EVENTS_DIR}"
@@ -384,9 +394,9 @@ action_edit_events() {
     for file in "${tcl_files[@]}"; do
         local display_name
         display_name=$(basename "$file")
-        # Indicate if it's a local override
+        # Indicate if it's a modified override
         if [[ "$file" == "$LOCAL_EVENTS_DIR"/* ]]; then
-            display_name="${display_name} (local)"
+            display_name="${display_name} (modified)"
         fi
         menu_items+=("$idx" "$display_name")
         ((idx++))
@@ -425,24 +435,83 @@ action_edit_events() {
         }
     fi
 
-    # Copy selected file to local dir (if from main directory)
-    local filename
-    filename=$(basename "$selected_file")
-    local local_file="${LOCAL_EVENTS_DIR}/${filename}"
-    
-    # Only copy if the selected file is from main directory and doesn't exist in local
-    if [[ "$selected_file" == "$EVENTS_DIR"/* ]] && [[ ! -f "$local_file" ]]; then
-        if ! cp "$selected_file" "$local_file"; then
-            show_result "Error" "Failed to copy file to:\n${local_file}"
-            return
-        fi
-        selected_file="$local_file"
-    fi
+# Edit selected file using a temporary copy,
+# then optionally save with a different filename
 
-    # Edit the file in local dir
-    $EDITOR "$selected_file"
+local original_filename
+original_filename=$(basename "$selected_file")
+
+# Create temp file
+local temp_file
+temp_file=$(mktemp "/tmp/${original_filename}.XXXXXX") || {
+    show_result "Error" "Failed to create temporary file"
+    return
 }
 
+# Cleanup temp file automatically
+trap 'rm -f "$temp_file"' RETURN
+
+# Copy source into temp file
+if ! cp "$selected_file" "$temp_file"; then
+    show_result "Error" "Failed to prepare temporary file"
+    return
+fi
+
+# Edit temp file
+"$EDITOR" "$temp_file"
+
+# Detect no changes
+if cmp -s "$selected_file" "$temp_file"; then
+    show_result "No Changes" "File was not modified."
+    return
+fi
+
+# Ask for save filename
+local save_name
+
+if [[ "$DIALOG" == "dialog" ]]; then
+    save_name=$(dialog \
+        --stdout \
+        --title " Save Event Script " \
+        --inputbox "\nSave as filename:" \
+        10 60 \
+        "$original_filename")
+else
+    save_name=$(whiptail \
+        --inputbox "\nSave as filename:" \
+        10 60 \
+        "$original_filename" \
+        3>&1 1>&2 2>&3)
+fi
+
+# Cancelled
+[[ $? -eq 0 ]] || return
+
+# Empty filename
+if [[ -z "$save_name" ]]; then
+    show_result "Error" "Filename cannot be empty."
+    return
+fi
+
+# Ensure .tcl extension
+[[ "$save_name" != *.tcl ]] && save_name="${save_name}.tcl"
+
+# Ensure local dir exists
+mkdir -p "$LOCAL_EVENTS_DIR" || {
+    show_result "Error" \
+        "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
+    return
+}
+
+local local_file="${LOCAL_EVENTS_DIR}/${save_name}"
+
+# Save edited version
+if ! cp "$temp_file" "$local_file"; then
+    show_result "Error" \
+        "Failed to save edited file to:\n${local_file}"
+    return
+fi
+}
 # =============================================================================
 # GPIO Action
 # =============================================================================
