@@ -1,23 +1,36 @@
-# svx
+# SvxLink Admin (svx)
 
-Interactive terminal tool for administering [SvxLink](https://github.com/sm0svx/svxlink) services on a Raspberry Pi.
+Interactive terminal tool for administering [SvxLink](https://github.com/sm0svx/svxlink) services on a Raspberry Pi. Simplifies management of repeater systems with a user-friendly menu interface.
 
-It is a fork from the original svxlin-cmd by Audric IW1GEU https://github.com/audric/svxlink-cmd
+This is a maintained fork of the original [svxlink-cmd](https://github.com/audric/svxlink-cmd) by [Audric IW1GEU](https://github.com/audric).
+
+## Table of Contents
+
+- [Features](#features)
+- [Services Managed](#services-managed)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
-- Start / Stop / Restart / Reload services
-- Detailed service status and live log following (journald or file)
-- Edit configuration, GPIO, and environment files
-- Enable / Disable services at boot
-- GPIO setup restart
-- Alsamixer integration (auto-detects USB audio device)
-- Log rotation check and auto-fix
-- Live system info: service status, CPU temperature, uptime, last boot
-- Audio Calibration tool for adjusting audio level on Rx and TX
-- Signal detector Calibration Tool for adjusting CTCSS tone sensitivity
+- **Service Control**: Start / Stop / Restart / Reload services
+- **Monitoring**: Detailed service status and live log following (journald or file)
+- **Configuration**: Edit configuration, GPIO, and environment files
+- **Boot Management**: Enable / Disable services at boot
+- **GPIO Setup**: GPIO pin setup and restart
+- **Audio Tools**: 
+  - Alsamixer integration (auto-detects USB audio device)
+  - Audio Calibration tool for adjusting audio level on Rx and TX
+  - Signal detector Calibration Tool for adjusting CTCSS tone sensitivity
+- **Maintenance**: Log rotation check and auto-fix
+- **System Info**: Live system display showing service status, CPU temperature, uptime, and last boot time
 
-## Services managed
+## Services Managed
 
 - `svxlink.service` — Main repeater controller
 - `remotetrx.service` — Remote transceiver
@@ -26,13 +39,24 @@ It is a fork from the original svxlin-cmd by Audric IW1GEU https://github.com/au
 
 ## Requirements
 
-- Raspberry Pi (or Debian-based system) with SvxLink installed
-- `dialog` or `whiptail` (auto-detected, will offer to install if missing)
+- **Hardware**: Raspberry Pi (or Debian-based system)
+- **Software**:
+  - SvxLink installed and configured
+  - `dialog` or `whiptail` (auto-detected; the script will offer to install if missing)
+  - `sudo` privileges (script must be run as root)
+  - `systemd` (for service management)
+  - `journalctl` (for log viewing)
 
-## Install
+## Installation
 
 ```bash
 sudo curl -sL https://raw.githubusercontent.com/vk5trm/svxlink-cmd/master/svx -o /usr/local/bin/svx && sudo chmod +x /usr/local/bin/svx
+```
+
+### Uninstall
+
+```bash
+sudo rm /usr/local/bin/svx
 ```
 
 ## Usage
@@ -41,7 +65,9 @@ sudo curl -sL https://raw.githubusercontent.com/vk5trm/svxlink-cmd/master/svx -o
 sudo svx
 ```
 
-## Screenshot
+This will launch the interactive admin menu. Navigate using arrow keys and select options with Enter.
+
+### Menu Overview
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
@@ -55,34 +81,95 @@ sudo svx
 │ │  4  Reload config (SIGHUP)            │ │
 │ │  ─  ─── Monitoring ─────────          │ │
 │ │  5  Show detailed status              │ │
-│ │  6  Follow live logs                  | |
-| |  7  System health check               │ │
+│ │  6  Follow live logs                  │ │
+│ │  7  System health check               │ │
 │ │  ─  ─── Configuration ──────          │ │
 │ │  8  Edit config file                  │ │
 │ │  9  Edit GPIO config                  │ │
-│ │ 10  Edit environment defaults         | | 
-│ │ 11  Edit event scripts (.tcl          | |
+│ │ 10  Edit environment defaults         │ │
+│ │ 11  Edit event scripts (.tcl)         │ │
 │ │  ─  ─── Audio ──────────────          │ │
 │ │ 12  Alsamixer                         │ │
-│ | 13  Audio Calibration tool            | |
-| | 14  Signal Level Detector Calibration | |
+│ │ 13  Audio Calibration tool            │ │
+│ │ 14  Signal Level Detector Calibration │ │
 │ │  ─  ─── Maintenance ────────          │ │
 │ │ 15  Check log rotation                │ │
 │ │  ─  ─── Boot & GPIO ────────          │ │
 │ │ 16  Enable service at boot            │ │
 │ │ 17  Disable service at boot           │ │
 │ │ 18  Restart GPIO setup                │ │
-| |───────────────────────────────────────┘ │
+│ └───────────────────────────────────────┘ │
 │          <OK>          <Quit>             │
 └───────────────────────────────────────────┘
 ```
 
-## Author
+## Configuration
 
-[Audric IW1GEU](https://github.com/audric)
+SvxLink configuration files are typically located in:
 
-[Rob VK5TRM](https://github.com/vk5trm)
+- **Main config**: `/etc/svxlink/svxlink.conf`
+- **GPIO config**: `/etc/svxlink/gpio.conf`
+- **Environment**: `/etc/default/svxlink`
+- **Event scripts**: `/usr/share/svxlink/events.d/` or `/etc/svxlink/events.d/`
+
+Use the "Edit config file" menu option for safe editing. Refer to the [SvxLink documentation](https://github.com/sm0svx/svxlink) for detailed configuration options.
+
+## Troubleshooting
+
+### "dialog: command not found"
+The script requires `dialog` or `whiptail` for the menu interface. The script will offer to install it, or manually install with:
+```bash
+sudo apt-get install dialog
+```
+
+### Permission denied when running `svx`
+The script must be run with `sudo`:
+```bash
+sudo svx
+```
+
+### Services not starting
+Check the service status and logs:
+```bash
+sudo systemctl status svxlink.service
+sudo journalctl -u svxlink.service -n 50
+```
+
+### Audio device not detected
+Verify USB audio device is connected and recognized:
+```bash
+arecord -l
+aplay -l
+```
+
+Then run audio calibration from the menu to detect and configure the device.
+
+### Log files not rotating
+Use menu option 15 (Check log rotation) to verify log rotation configuration and auto-fix issues.
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+For bug reports or feature requests, please open an [issue](https://github.com/vk5trm/svxlink-cmd/issues).
+
+## Authors
+
+- [Audric IW1GEU](https://github.com/audric) — Original creator
+- [Rob VK5TRM](https://github.com/vk5trm) — Current maintainer
 
 ## License
 
-GPL-3.0
+GPL-3.0 — See LICENSE file for details
+
+---
+
+**Related Projects:**
+- [SvxLink](https://github.com/sm0svx/svxlink) — Main SvxLink project
+- [Original svxlink-cmd](https://github.com/audric/svxlink-cmd) — Original repository
