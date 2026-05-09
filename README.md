@@ -2,6 +2,8 @@
 
 Interactive terminal tool for administering [SvxLink](https://github.com/sm0svx/svxlink) services on a Raspberry Pi.
 
+It is a fork from the original svxlin-cmd by Audric IW1GEU https://github.com/audric/svxlink-cmd
+
 ## Features
 
 - Start / Stop / Restart / Reload services
@@ -30,7 +32,7 @@ Interactive terminal tool for administering [SvxLink](https://github.com/sm0svx/
 ## Install
 
 ```bash
-sudo curl -sL https://raw.githubusercontent.com/audric/svxlink-cmd/master/svx -o /usr/local/bin/svx && sudo chmod +x /usr/local/bin/svx
+sudo curl -sL https://raw.githubusercontent.com/vk5trm/svxlink-cmd/master/svx -o /usr/local/bin/svx && sudo chmod +x /usr/local/bin/svx
 ```
 
 ## Usage
@@ -80,10 +82,6 @@ sudo svx
 [Audric IW1GEU](https://github.com/audric)
 
 [Rob VK5TRM](https://github.com/vk5trm)
-
-## Other projects
-
-Check out [SvxReflectorDashboard](https://github.com/audric/SvxReflectorDashboard) — a web dashboard for SvxReflector.
 
 ## License
 
