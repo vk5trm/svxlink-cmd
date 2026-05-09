@@ -343,9 +343,35 @@ action_edit_events() {
         return
     fi
 
-    # Find all .tcl files using mapfile (more reliable)
-    local tcl_files
-    mapfile -t tcl_files < <(find "$EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
+    # Find all .tcl files in events.d (main directory)
+    local main_files
+    mapfile -t main_files < <(find "$EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
+
+    # Find all .tcl files in events.d/local (local overrides)
+    local local_files=()
+    if [[ -d "$LOCAL_EVENTS_DIR" ]]; then
+        mapfile -t local_files < <(find "$LOCAL_EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
+    fi
+
+    # Combine the lists: main files first, then local-only files
+    local tcl_files=()
+    
+    # Add all main files
+    for file in "${main_files[@]}"; do
+        tcl_files+=("$file")
+    done
+    
+    # Add local files that don't exist in main directory
+    for local_file in "${local_files[@]}"; do
+        local basename_local
+        basename_local=$(basename "$local_file")
+        local main_file="${EVENTS_DIR}/${basename_local}"
+        
+        # If file doesn't exist in main directory, add it from local
+        if [[ ! -f "$main_file" ]]; then
+            tcl_files+=("$local_file")
+        fi
+    done
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${EVENTS_DIR}"
@@ -356,7 +382,13 @@ action_edit_events() {
     local -a menu_items=()
     local idx=1
     for file in "${tcl_files[@]}"; do
-        menu_items+=("$idx" "$(basename "$file")")
+        local display_name
+        display_name=$(basename "$file")
+        # Indicate if it's a local override
+        if [[ "$file" == "$LOCAL_EVENTS_DIR"/* ]]; then
+            display_name="${display_name} (local)"
+        fi
+        menu_items+=("$idx" "$display_name")
         ((idx++))
     done
 
@@ -393,18 +425,22 @@ action_edit_events() {
         }
     fi
 
-    # Copy selected file to local dir
+    # Copy selected file to local dir (if from main directory)
     local filename
     filename=$(basename "$selected_file")
     local local_file="${LOCAL_EVENTS_DIR}/${filename}"
     
-    if ! cp "$selected_file" "$local_file"; then
-        show_result "Error" "Failed to copy file to:\n${local_file}"
-        return
+    # Only copy if the selected file is from main directory and doesn't exist in local
+    if [[ "$selected_file" == "$EVENTS_DIR"/* ]] && [[ ! -f "$local_file" ]]; then
+        if ! cp "$selected_file" "$local_file"; then
+            show_result "Error" "Failed to copy file to:\n${local_file}"
+            return
+        fi
+        selected_file="$local_file"
     fi
 
     # Edit the file in local dir
-    $EDITOR "$local_file"
+    $EDITOR "$selected_file"
 }
 
 # =============================================================================
