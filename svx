@@ -345,7 +345,7 @@ action_edit_events() {
 
     # Find all .tcl files using mapfile (more reliable)
     local tcl_files
-    mapfile -t tcl_files < <(find "$EVENTS_DIR" -name "*.tcl" -type f 2>/dev/null | sort)
+    mapfile -t tcl_files < <(find "$EVENTS_DIR" -maxdepth 1 -name "*.tcl" -type f 2>/dev/null | sort)
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${EVENTS_DIR}"
