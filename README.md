@@ -112,7 +112,9 @@ SvxLink configuration files are typically located in:
 - **Environment**: `/etc/default/svxlink`
 - **Event scripts**: `/usr/share/svxlink/events.d/` or `/etc/svxlink/events.d/`
 
-Use the "Edit config file" menu option for safe editing. Refer to the [SvxLink documentation](https://github.com/sm0svx/svxlink) for detailed configuration options.
+Use the "Edit config file" menu option for safe editing. Refer to the [SvxLink.conf documentation](https://www.svxlink.org/doc/man/man5/svxlink.conf.5.html) for detailed configuration options.
+
+Use the "Edit events scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen or you get lots of errors in the log.
 
 ## Troubleshooting
 
