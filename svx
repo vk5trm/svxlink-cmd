@@ -870,7 +870,7 @@ main_menu() {
         "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
         "─" "$(printf "%-${W}s" "─── Maintenance ────────")"
         "14" "$(printf "%-${W}s" "Check log rotation")"
-        "─" "$(printf "%-${W}s" "─── Boot & GPIO ────────")"
+        "─" "$(printf "%-${W}s" "─── Boot ─────────────")"
         "15" "$(printf "%-${W}s" "Enable service at boot")"
         "16" "$(printf "%-${W}s" "Disable service at boot")"
         
