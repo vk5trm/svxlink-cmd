@@ -97,12 +97,13 @@ fi
 EDITOR="${EDITOR:-$(command -v nano || command -v vi || echo "vi")}"
 
 # --- Services ---
-readonly SERVICES=("svxlink" "remotetrx" "svxreflector")
+readonly SERVICES=("svxlink" "remotetrx" "svxreflector" "svxlink_gpio_setup")
 
 declare -A SERVICE_LABELS=(
     [svxlink]="SvxLink"
     [remotetrx]="RemoteTRX"
     [svxreflector]="SvxReflector"
+    [svxlink_gpio_setup]="GPIO setup"
 )
 
 declare -A CONFIG_FILES=(
@@ -249,7 +250,6 @@ do_service_action() {
 action_start()   { do_service_action "start"; }
 action_stop()    { do_service_action "stop"; }
 action_restart() { do_service_action "restart"; }
-action_reload()  { do_service_action "reload"; }
 action_enable()  { do_service_action "enable"; }
 action_disable() { do_service_action "disable"; }
 
@@ -855,26 +855,24 @@ main_menu() {
         "1"  "$(printf "%-${W}s" "Start service")"
         "2"  "$(printf "%-${W}s" "Stop service")"
         "3"  "$(printf "%-${W}s" "Restart service")"
-        "4"  "$(printf "%-${W}s" "Reload config (SIGHUP)")"
-        "─1" "$(printf "%-${W}s" "─── Monitoring ─────────")"
-        "5"  "$(printf "%-${W}s" "Show detailed status")"
-        "6"  "$(printf "%-${W}s" "Follow live logs")"
-        "7"  "$(printf "%-${W}s" "System health check")"
-        "─2" "$(printf "%-${W}s" "─── Configuration ──────")"
-        "8"  "$(printf "%-${W}s" "Edit config file")"
-        "9"  "$(printf "%-${W}s" "Edit GPIO config")"
-        "10" "$(printf "%-${W}s" "Edit environment defaults")"
-        "11" "$(printf "%-${W}s" "Edit event scripts (.tcl)")"
-        "─3" "$(printf "%-${W}s" "─── Audio ──────────────")"
-        "12" "$(printf "%-${W}s" "Alsamixer")"
-        "13" "$(printf "%-${W}s" "Audio Calibration Tool")"
-        "14" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
-        "─4" "$(printf "%-${W}s" "─── Maintenance ────────")"
-        "15" "$(printf "%-${W}s" "Check log rotation")"
-        "─5" "$(printf "%-${W}s" "─── Boot & GPIO ────────")"
-        "16" "$(printf "%-${W}s" "Enable service at boot")"
-        "17" "$(printf "%-${W}s" "Disable service at boot")"
-        "18" "$(printf "%-${W}s" "Restart GPIO setup")"
+        "─" "$(printf "%-${W}s" "─── Monitoring ─────────")"
+        "4"  "$(printf "%-${W}s" "Show detailed status")"
+        "5"  "$(printf "%-${W}s" "Follow live logs")"
+        "6"  "$(printf "%-${W}s" "System health check")"
+        "─" "$(printf "%-${W}s" "─── Configuration ──────")"
+        "7"  "$(printf "%-${W}s" "Edit config file")"
+        "8"  "$(printf "%-${W}s" "Edit GPIO config")"
+        "9" "$(printf "%-${W}s" "Edit environment defaults")"
+        "10" "$(printf "%-${W}s" "Edit event scripts (.tcl)")"
+        "─" "$(printf "%-${W}s" "─── Audio ──────────────")"
+        "11" "$(printf "%-${W}s" "Alsamixer")"
+        "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
+        "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
+        "─" "$(printf "%-${W}s" "─── Maintenance ────────")"
+        "14" "$(printf "%-${W}s" "Check log rotation")"
+        "─" "$(printf "%-${W}s" "─── Boot & GPIO ────────")"
+        "15" "$(printf "%-${W}s" "Enable service at boot")"
+        "16" "$(printf "%-${W}s" "Disable service at boot")"
         
     )
 
@@ -907,21 +905,19 @@ while true; do
         1)  action_start ;;
         2)  action_stop ;;
         3)  action_restart ;;
-        4)  action_reload ;;
-        5)  action_status ;;
-        6)  action_logs ;;
-        7)  action_health_check ;;
-        8)  action_edit_config ;;
-        9)  action_edit_gpio ;;
-        10) action_edit_env ;;
-        11) action_edit_events ;;
-        12) action_alsamixer  ;;
-        13) action_devcal_sections ;;
-        14) action_siglevdetcal ;;
-        15) action_check_logrotate ;;
-        16) action_enable ;;
-        17) action_disable ;;
-        18) action_gpio_restart ;;
+        4)  action_status ;;
+        5)  action_logs ;;
+        6)  action_health_check ;;
+        7)  action_edit_config ;;
+        8)  action_edit_gpio ;;
+        9)  action_edit_env ;;
+        10) action_edit_events ;;
+        11) action_alsamixer  ;;
+        12) action_devcal_sections ;;
+        13) action_siglevdetcal ;;
+        14) action_check_logrotate ;;
+        15) action_enable ;;
+        16) action_disable ;;
         *)  ;; # separator selected, ignore
     esac
 done
