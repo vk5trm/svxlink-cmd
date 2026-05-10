@@ -372,7 +372,6 @@ while IFS= read -r -d '' file; do
     base=$(basename "$file")
 
     if [[ -z "${seen_files[$base]:-}" ]]; then
-#    if [[ -z "${seen_files[$base]}" ]]; then
         tcl_files+=("$file")
     fi
 done < <(
@@ -443,7 +442,7 @@ original_filename=$(basename "$selected_file")
 
 # Create temp file
 local temp_file
-temp_file=$(mktemp "/tmp/${original_filename}.XXXXXX") || {
+temp_file=$(mktemp "/run/${original_filename}.XXXXXX") || {
     show_result "Error" "Failed to create temporary file"
     return
 }
