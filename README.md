@@ -18,11 +18,11 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
 
 ## Features
 
-- **Service Control**: Start / Stop / Restart / Reload services
+- **Service Control**: Start / Stop / Restart services
 - **Monitoring**: Detailed service status and live log following (journald or file)
 - **Configuration**: Edit configuration, GPIO, events scripts and environment files
 - **Boot Management**: Enable / Disable services at boot
-- **GPIO Setup**: GPIO pin setup and restart
+- **GPIO Setup**: GPIO pin setup
 - **Audio Tools**: 
   - Alsamixer integration (auto-detects USB audio device)
   - Audio Calibration tool for adjusting audio level on Rx and TX
