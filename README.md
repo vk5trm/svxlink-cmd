@@ -78,26 +78,24 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │  1  Start service                     │ │
 │ │  2  Stop service                      │ │
 │ │  3  Restart service                   │ │
-│ │  4  Reload config (SIGHUP)            │ │
 │ │  ─  ─── Monitoring ─────────          │ │
-│ │  5  Show detailed status              │ │
-│ │  6  Follow live logs                  │ │
-│ │  7  System health check               │ │
+│ │  4  Show detailed status              │ │
+│ │  5  Follow live logs                  │ │
+│ │  6  System health check               │ │
 │ │  ─  ─── Configuration ──────          │ │
-│ │  8  Edit config file                  │ │
-│ │  9  Edit GPIO config                  │ │
-│ │ 10  Edit environment defaults         │ │
-│ │ 11  Edit event scripts (.tcl)         │ │
+│ │  7  Edit config file                  │ │
+│ │  8  Edit GPIO config                  │ │
+│ │  9  Edit environment defaults         │ │
+│ │ 10  Edit event scripts (.tcl)         │ │
 │ │  ─  ─── Audio ──────────────          │ │
-│ │ 12  Alsamixer                         │ │
-│ │ 13  Audio Calibration tool            │ │
-│ │ 14  Signal Level Detector Calibration │ │
+│ │ 11  Alsamixer                         │ │
+│ │ 12  Audio Calibration tool            │ │
+│ │ 13  Signal Level Detector Calibration │ │
 │ │  ─  ─── Maintenance ────────          │ │
-│ │ 15  Check log rotation                │ │
+│ │ 14  Check log rotation                │ │
 │ │  ─  ─── Boot & GPIO ────────          │ │
-│ │ 16  Enable service at boot            │ │
-│ │ 17  Disable service at boot           │ │
-│ │ 18  Restart GPIO setup                │ │
+│ │ 15  Enable service at boot            │ │
+│ │ 16  Disable service at boot           │ │
 │ └───────────────────────────────────────┘ │
 │          <OK>          <Quit>             │
 └───────────────────────────────────────────┘
@@ -147,7 +145,7 @@ aplay -l
 Then run audio calibration from the menu to detect and configure the device.
 
 ### Log files not rotating
-Use menu option 15 (Check log rotation) to verify log rotation configuration and auto-fix issues.
+Use menu option 14 (Check log rotation) to verify log rotation configuration and auto-fix issues.
 
 ## Contributing
 
