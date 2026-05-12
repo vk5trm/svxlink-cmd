@@ -93,7 +93,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │ 13  Signal Level Detector Calibration │ │
 │ │  ─  ─── Maintenance ────────          │ │
 │ │ 14  Check log rotation                │ │
-│ │  ─  ─── Boot & GPIO ────────          │ │
+│ │  ─  ────── Boot  ───────────          │ │
 │ │ 15  Enable service at boot            │ │
 │ │ 16  Disable service at boot           │ │
 │ └───────────────────────────────────────┘ │
