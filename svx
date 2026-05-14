@@ -532,8 +532,8 @@ readonly LOGROTATE_CONTENT="/var/log/svxlink
 /var/log/remotetrx
 /var/log/svxreflector
 {
-    weekly
-    rotate 4
+    daily
+    rotate 7
     compress
     delaycompress
     missingok
@@ -598,13 +598,6 @@ action_health_check() {
         whiptail --title " System Health " \
             --msgbox "$report" 28 70
     fi
-}
-
-action_gpio_restart() {
-    local output
-    output=$(systemctl restart svxlink_gpio_setup.service 2>&1) && \
-        show_result "Success" "GPIO setup restarted.\n\n${output}" || \
-        show_result "Error" "GPIO setup restart failed.\n\n${output}"
 }
 
 # =============================================================================
