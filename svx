@@ -527,8 +527,9 @@ action_alsamixer() {
     fi
 }
 
-readonly LOGROTATE_CONF="/etc/logrotate.d/svxlink"
-readonly LOGROTATE_CONTENT="/var/log/svxlink
+readonly LOGROTATE_CONF="/etc/logrotate.d/svxlink-server"
+readonly LOGROTATE_CONTENT='
+/var/log/svxlink
 /var/log/remotetrx
 /var/log/svxreflector
 {
@@ -539,7 +540,7 @@ readonly LOGROTATE_CONTENT="/var/log/svxlink
     missingok
     notifempty
     copytruncate
-}"
+}'
 
 action_check_logrotate() {
     # Check if any file-based logs exist
@@ -566,10 +567,10 @@ action_check_logrotate() {
     else
         if [[ "$DIALOG" == "dialog" ]]; then
             dialog --colors --no-shadow --title " Log Rotation Missing " \
-                --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nWeekly rotation, 4 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
+                --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nDaily rotation, 7 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
         else
             whiptail --title " Log Rotation Missing " \
-                --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nWeekly rotation, 4 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
+                --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nDaily rotation, 7 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
         fi
         if [[ $? -eq 0 ]]; then
             echo "$LOGROTATE_CONTENT" > "$LOGROTATE_CONF"
@@ -833,7 +834,13 @@ action_siglevdetcal() {
     echo "Done! Press Enter to return to menu..."
     read -r
 }
-
+action_reboot() {
+ # Restart Computer
+    clear
+    echo "=== Restarting Computer ==="
+    reboot -n
+    sleep 2
+}
 # =============================================================================
 # Main Menu
 # =============================================================================
@@ -866,7 +873,7 @@ main_menu() {
         "─" "$(printf "%-${W}s" "───── Boot ─────────────")"
         "15" "$(printf "%-${W}s" "Enable service at boot")"
         "16" "$(printf "%-${W}s" "Disable service at boot")"
-        
+        "17" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -911,7 +918,8 @@ while true; do
         14) action_check_logrotate ;;
         15) action_enable ;;
         16) action_disable ;;
-        *)  ;; # separator selected, ignore
+        17) action_reboot ;;
+         *)  ;; # separator selected, ignore
     esac
 done
 
