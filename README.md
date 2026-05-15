@@ -71,7 +71,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v1.0.0 ────────────┐
+┌──────────── Svx Admin v2.4.2 ────────────┐
 │                                           │
 │  Choose an action:                        │
 │ ┌───────────────────────────────────────┐ │
