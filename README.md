@@ -96,6 +96,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │  ─  ────── Boot  ───────────          │ │
 │ │ 15  Enable service at boot            │ │
 │ │ 16  Disable service at boot           │ │
+| | 17  Reboot Computer                   | | 
 │ └───────────────────────────────────────┘ │
 │          <OK>          <Quit>             │
 └───────────────────────────────────────────┘
