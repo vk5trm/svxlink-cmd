@@ -70,7 +70,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v2.4.2 ────────────┐
+┌──────────── Svx Admin v2.4.5  ────────────┐
 │                                           │
 │  Choose an action:                        │
 │ ┌───────────────────────────────────────┐ │
@@ -104,14 +104,14 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 SvxLink configuration files are typically located in:
 
-- **SVXLink config**: `/etc/svxlink/svxlink.conf`
-- **RemoteTRX config**: `/etc/svxlink/remotetrx.conf`
-- **SVXReflector config**: `/etc/svxlink/svxreflector.conf`
+- [**SVXLink config**:](https://www.svxlink.org/doc/man/man5/svxlink.conf.5.html) `/etc/svxlink/svxlink.conf`
+- [**RemoteTRX config**:](http://svxlink.org/doc/man/man5/remotetrx.conf.5.html) `/etc/svxlink/remotetrx.conf`
+- [**SVXReflector config**:]( http://svxlink.org/doc/man/man5/svxreflector.conf.5.html)`/etc/svxlink/svxreflector.conf`
 - **GPIO config**: `/etc/svxlink/gpio.conf`
 - **Environment**: `/etc/default/`
 - **Event scripts**: `/usr/share/svxlink/events.d/` and `/usr/share/svxlink/events.d/local/`
 
-Use the "Edit config file" menu option for safe editing. Refer to the [SvxLink.conf documentation](https://www.svxlink.org/doc/man/man5/svxlink.conf.5.html) for detailed configuration options.
+Use the "Edit config file" menu option for safe editing. Click on the above config file for detailed configuration options.
 
 Use the "Edit events scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
 
