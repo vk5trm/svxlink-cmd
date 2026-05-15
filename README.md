@@ -20,9 +20,8 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
 
 - **Service Control**: Start / Stop / Restart services
 - **Monitoring**: Detailed service status and live log following (journald or file)
-- **Configuration**: Edit configuration, GPIO, events scripts and environment files
-- **Boot Management**: Enable / Disable services at boot
-- **GPIO Setup**: GPIO pin setup
+- **Configuration**: Edit configuration, events scripts and environment files
+- **Boot Management**: Enable / Disable services at boot and reboot system
 - **Audio Tools**: 
   - Alsamixer integration (auto-detects USB audio device)
   - Audio Calibration tool for adjusting audio level on Rx and TX
@@ -84,19 +83,18 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │  6  System health check               │ │
 │ │  ─  ─── Configuration ──────          │ │
 │ │  7  Edit config file                  │ │
-│ │  8  Edit GPIO config                  │ │
-│ │  9  Edit environment defaults         │ │
-│ │ 10  Edit event scripts (.tcl)         │ │
+│ │  8  Edit environment defaults         │ │
+│ │  9  Edit event scripts (.tcl)         │ │
 │ │  ─  ─── Audio ──────────────          │ │
-│ │ 11  Alsamixer                         │ │
-│ │ 12  Audio Calibration tool            │ │
-│ │ 13  Signal Level Detector Calibration │ │
+│ │ 10  Alsamixer                         │ │
+│ │ 11  Audio Calibration tool            │ │
+│ │ 12  Signal Level Detector Calibration │ │
 │ │  ─  ─── Maintenance ────────          │ │
-│ │ 14  Check log rotation                │ │
+│ │ 13  Check log rotation                │ │
 │ │  ─  ────── Boot  ───────────          │ │
-│ │ 15  Enable service at boot            │ │
-│ │ 16  Disable service at boot           │ │
-| | 17  Reboot Computer                   | | 
+│ │ 14  Enable service at boot            │ │
+│ │ 15  Disable service at boot           │ │
+| | 16  Reboot Computer                   | | 
 │ └───────────────────────────────────────┘ │
 │          <OK>          <Quit>             │
 └───────────────────────────────────────────┘
@@ -106,10 +104,12 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 SvxLink configuration files are typically located in:
 
-- **Main config**: `/etc/svxlink/svxlink.conf`
+- **SVXLink config**: `/etc/svxlink/svxlink.conf`
+- **RemoteTRX config**: `/etc/svxlink/remotetrx.conf`
+- **SVXReflector config**: `/etc/svxlink/svxreflector.conf`
 - **GPIO config**: `/etc/svxlink/gpio.conf`
-- **Environment**: `/etc/default/svxlink`
-- **Event scripts**: `/usr/share/svxlink/events.d/` or `/etc/svxlink/events.d/`
+- **Environment**: `/etc/default/`
+- **Event scripts**: `/usr/share/svxlink/events.d/` and `/usr/share/svxlink/events.d/local/`
 
 Use the "Edit config file" menu option for safe editing. Refer to the [SvxLink.conf documentation](https://www.svxlink.org/doc/man/man5/svxlink.conf.5.html) for detailed configuration options.
 
@@ -146,7 +146,7 @@ aplay -l
 Then run audio calibration from the menu to detect and configure the device.
 
 ### Log files not rotating
-Use menu option 14 (Check log rotation) to verify log rotation configuration and auto-fix issues.
+Use menu option 13 (Check log rotation) to verify log rotation configuration and auto-fix issues.
 
 ## Contributing
 
