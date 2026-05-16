@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.6.5"
+readonly VERSION="2.7.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Root check ---
@@ -509,6 +509,72 @@ fi
 }
 
 # =============================================================================
+# NEW FUNCTION: Edit Module TCL Files added by VK5TRM
+# =============================================================================
+
+action_edit_module_tcl_files() {
+    if [[ ! -d "$MODULES_EVENTS_DIR" ]]; then
+        show_result "Error" "Module events directory not found:\n${MODULES_EVENTS_DIR}"
+        return
+    fi
+
+    # Find all .tcl files in module events directory
+    local -a tcl_files=()
+    while IFS= read -r -d '' file; do
+        tcl_files+=("$file")
+    done < <(
+        find "$MODULES_EVENTS_DIR" \
+            -maxdepth 2 \
+            -type f \
+            -name "*.tcl" \
+            -print0 | sort -z
+    )
+
+    if [[ ${#tcl_files[@]} -eq 0 ]]; then
+        show_result "No TCL Files" "No .tcl files found in:\n${MODULES_EVENTS_DIR}"
+        return
+    fi
+
+    # Build menu items - show only filename
+    local -a menu_items=()
+    local idx=1
+    for file in "${tcl_files[@]}"; do
+        local display_name
+        display_name=$(basename "$file")
+        menu_items+=("$idx" "$display_name")
+        ((idx++))
+    done
+
+    # Display menu using eval for proper expansion
+    local cmd
+    if [[ "$DIALOG" == "dialog" ]]; then
+        cmd="dialog --colors --no-shadow --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
+    else
+        cmd="whiptail --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
+    fi
+    
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
+    eval "$cmd" || return
+
+    local choice
+    choice=$(<"$DIALOG_OUT")
+    
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return
+    fi
+
+    local selected_file="${tcl_files[$((choice - 1))]}"
+
+    if [[ ! -f "$selected_file" ]]; then
+        show_result "Error" "File not found:\n${selected_file}"
+        return
+    fi
+
+    # Edit the selected file directly
+    $EDITOR "$selected_file"
+}
+
+# =============================================================================
 # NEW FUNCTION: Edit Modules Config added by VK5TRM
 # =============================================================================
 
@@ -925,20 +991,21 @@ main_menu() {
         "5"  "$(printf "%-${W}s" "Follow live logs")"
         "6"  "$(printf "%-${W}s" "System health check")"
         "─"  "$(printf "%-${W}s" "─── Configuration ──────")"
-        "7"  "$(printf "%-${W}s" "Edit main config files")"
+        "7"  "$(printf "%-${W}s" "Edit config file")"
         "8"  "$(printf "%-${W}s" "Edit environment defaults")"
-        "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
+        "9"  "$(printf "%-${W}s" "Edit event scripts (.tcl)")"
         "10" "$(printf "%-${W}s" "Edit modules config")"
+        "11" "$(printf "%-${W}s" "Edit module TCL files")"
         "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
-        "11" "$(printf "%-${W}s" "Alsamixer")"
-        "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
-        "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
+        "12" "$(printf "%-${W}s" "Alsamixer")"
+        "13" "$(printf "%-${W}s" "Audio Calibration Tool")"
+        "14" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
         "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
-        "14" "$(printf "%-${W}s" "Check log rotation")"
+        "15" "$(printf "%-${W}s" "Check log rotation")"
         "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
-        "15" "$(printf "%-${W}s" "Enable service at boot")"
-        "16" "$(printf "%-${W}s" "Disable service at boot")"
-        "17" "$(printf "%-${W}s" "Reboot Computer")"
+        "16" "$(printf "%-${W}s" "Enable service at boot")"
+        "17" "$(printf "%-${W}s" "Disable service at boot")"
+        "18" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -946,14 +1013,14 @@ main_menu() {
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-label "Quit" \
-            --menu "\nChoose an action:\n" 35 50 26 \
+            --menu "\nChoose an action:\n" 37 50 28 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     else
         whiptail \
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-button "Quit" \
-            --menu "\nChoose an action:\n" 35 50 26 \
+            --menu "\nChoose an action:\n" 37 50 28 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     fi
 }
@@ -977,13 +1044,14 @@ while true; do
         8)  action_edit_env ;;
         9)  action_edit_events ;;
         10) action_edit_modules_config ;;
-        11) action_alsamixer ;;
-        12) action_devcal_sections ;;
-        13) action_siglevdetcal ;;
-        14) action_check_logrotate ;;
-        15) action_enable ;;
-        16) action_disable ;;
-        17) action_reboot ;;
+        11) action_edit_module_tcl_files ;;
+        12) action_alsamixer ;;
+        13) action_devcal_sections ;;
+        14) action_siglevdetcal ;;
+        15) action_check_logrotate ;;
+        16) action_enable ;;
+        17) action_disable ;;
+        18) action_reboot ;;
          *)  ;; # separator selected, ignore
     esac
 done
