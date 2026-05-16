@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.5.5"
+readonly VERSION="2.6.5"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Root check ---
@@ -127,10 +127,9 @@ declare -A LOG_FILES=(
     [svxlink_gpio_setup]="/var/log/gpio"
 )
 
-# readonly GPIO_CONF="/etc/svxlink/gpio.conf"
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
-readonly MODULES_DIR="/usr/share/svxlink/modules"
+readonly MODULES_DIR="/etc/svxlink/svxlink.d/"
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -524,7 +523,7 @@ action_edit_modules_config() {
         conf_files+=("$file")
     done < <(
         find "$MODULES_DIR" \
-            -maxdepth 2 \
+            -maxdepth 1 \
             -type f \
             -name "*.conf" \
             -print0 | sort -z
