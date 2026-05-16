@@ -129,6 +129,7 @@ declare -A LOG_FILES=(
 
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
+readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly MODULES_DIR="/etc/svxlink/svxlink.d/"
 
 # Get service status as a word: active, inactive, failed, unknown
@@ -924,9 +925,9 @@ main_menu() {
         "5"  "$(printf "%-${W}s" "Follow live logs")"
         "6"  "$(printf "%-${W}s" "System health check")"
         "─"  "$(printf "%-${W}s" "─── Configuration ──────")"
-        "7"  "$(printf "%-${W}s" "Edit config file")"
+        "7"  "$(printf "%-${W}s" "Edit main config files")"
         "8"  "$(printf "%-${W}s" "Edit environment defaults")"
-        "9"  "$(printf "%-${W}s" "Edit event scripts (.tcl)")"
+        "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
         "10" "$(printf "%-${W}s" "Edit modules config")"
         "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
         "11" "$(printf "%-${W}s" "Alsamixer")"
