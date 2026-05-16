@@ -534,12 +534,12 @@ action_edit_modules_config() {
         return
     fi
 
-    # Build menu items
+    # Build menu items - show only filename
     local -a menu_items=()
     local idx=1
     for file in "${conf_files[@]}"; do
         local display_name
-        display_name="${file#$MODULES_DIR/}"
+        display_name=$(basename "$file")
         menu_items+=("$idx" "$display_name")
         ((idx++))
     done
