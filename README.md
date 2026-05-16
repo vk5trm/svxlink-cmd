@@ -121,9 +121,9 @@ SvxLink configuration files are typically located in:
                     - [Module_PropagationMonitor:](https://www.svxlink.org/doc/man/man5/ModulePropagationMonitor.conf.5.html)
                     - [Module_SelCallEnc:](https://www.svxlink.org/doc/man/man5/ModuleSelCallEnc.conf.5.html)
   
-Use the "Edit main config file" & Edit Modules config menu option for safe editing of main configuration files. Click on the above config file for detailed configuration options.
+Use the "Edit main config file" & "Edit Modules config" menu option for safe editing of configuration files. Click on the above config file for detailed configuration options.
 
-Use the "Edit main events scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
+Use the "Edit main events scripts" & "Edit modules event scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
 
 ## Troubleshooting
 
