@@ -156,7 +156,7 @@ aplay -l
 Then run audio calibration from the menu to detect and configure the device.
 
 ### Log files not rotating
-Use menu option 13 (Check log rotation) to verify log rotation configuration and auto-fix issues.
+Use menu option 15 (Check log rotation) to verify log rotation configuration and auto-fix issues.
 
 ## Contributing
 
