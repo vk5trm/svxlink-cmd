@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.7.0"
+readonly VERSION="2.6.6"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Root check ---
@@ -509,72 +509,6 @@ fi
 }
 
 # =============================================================================
-# NEW FUNCTION: Edit Module TCL Files added by VK5TRM
-# =============================================================================
-
-action_edit_module_tcl_files() {
-    if [[ ! -d "$MODULES_EVENTS_DIR" ]]; then
-        show_result "Error" "Module events directory not found:\n${MODULES_EVENTS_DIR}"
-        return
-    fi
-
-    # Find all .tcl files in module events directory
-    local -a tcl_files=()
-    while IFS= read -r -d '' file; do
-        tcl_files+=("$file")
-    done < <(
-        find "$MODULES_EVENTS_DIR" \
-            -maxdepth 2 \
-            -type f \
-            -name "*.tcl" \
-            -print0 | sort -z
-    )
-
-    if [[ ${#tcl_files[@]} -eq 0 ]]; then
-        show_result "No TCL Files" "No .tcl files found in:\n${MODULES_EVENTS_DIR}"
-        return
-    fi
-
-    # Build menu items - show only filename
-    local -a menu_items=()
-    local idx=1
-    for file in "${tcl_files[@]}"; do
-        local display_name
-        display_name=$(basename "$file")
-        menu_items+=("$idx" "$display_name")
-        ((idx++))
-    done
-
-    # Display menu using eval for proper expansion
-    local cmd
-    if [[ "$DIALOG" == "dialog" ]]; then
-        cmd="dialog --colors --no-shadow --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
-    else
-        cmd="whiptail --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
-    fi
-    
-    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
-    eval "$cmd" || return
-
-    local choice
-    choice=$(<"$DIALOG_OUT")
-    
-    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return
-    fi
-
-    local selected_file="${tcl_files[$((choice - 1))]}"
-
-    if [[ ! -f "$selected_file" ]]; then
-        show_result "Error" "File not found:\n${selected_file}"
-        return
-    fi
-
-    # Edit the selected file directly
-    $EDITOR "$selected_file"
-}
-
-# =============================================================================
 # NEW FUNCTION: Edit Modules Config added by VK5TRM
 # =============================================================================
 
@@ -641,8 +575,70 @@ action_edit_modules_config() {
 }
 
 # =============================================================================
-# GPIO Action
+# NEW FUNCTION: Edit Module event Files added by VK5TRM
 # =============================================================================
+
+action_edit_module_event_files() {
+    if [[ ! -d "$MODULES_EVENTS_DIR" ]]; then
+        show_result "Error" "Module events directory not found:\n${MODULES_EVENTS_DIR}"
+        return
+    fi
+
+    # Find all .tcl files in module events directory
+    local -a tcl_files=()
+    while IFS= read -r -d '' file; do
+        tcl_files+=("$file")
+    done < <(
+        find "$MODULES_EVENTS_DIR" \
+            -maxdepth 1 \
+            -type f \
+            -name "*.tcl" \
+            -print0 | sort -z
+    )
+
+    if [[ ${#tcl_files[@]} -eq 0 ]]; then
+        show_result "No TCL Files" "No .tcl files found in:\n${MODULES_EVENTS_DIR}"
+        return
+    fi
+
+    # Build menu items - show only filename
+    local -a menu_items=()
+    local idx=1
+    for file in "${tcl_files[@]}"; do
+        local display_name
+        display_name=$(basename "$file")
+        menu_items+=("$idx" "$display_name")
+        ((idx++))
+    done
+
+    # Display menu using eval for proper expansion
+    local cmd
+    if [[ "$DIALOG" == "dialog" ]]; then
+        cmd="dialog --colors --no-shadow --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
+    else
+        cmd="whiptail --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
+    fi
+    
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
+    eval "$cmd" || return
+
+    local choice
+    choice=$(<"$DIALOG_OUT")
+    
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return
+    fi
+
+    local selected_file="${tcl_files[$((choice - 1))]}"
+
+    if [[ ! -f "$selected_file" ]]; then
+        show_result "Error" "File not found:\n${selected_file}"
+        return
+    fi
+
+    # Edit the selected file directly
+    $EDITOR "$selected_file"
+}
 
 action_alsamixer() {
     local usb_card=""
@@ -842,13 +838,13 @@ action_devcal_sections() {
         section="$tx_section"
         flag="-t"
     fi
-    
+    if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
     # Stop svxlink service
     clear
     echo "=== Stopping svxlink service ==="
     systemctl stop svxlink.service
     sleep 2
-    
+fi
     # Run devcal
     echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
     echo ""
@@ -857,12 +853,7 @@ action_devcal_sections() {
         devcal ${flag} "$conf" "$section"
     )
     
-    # Restart svxlink service
-    echo ""
-    echo "=== Restarting svxlink service ==="
-    systemctl start svxlink.service
-    sleep 2
-    
+    echo "=== Don't forget to Restart svxlink service ==="
     echo "Done! Press Enter to return to menu..."
     read -r
 }
@@ -940,12 +931,14 @@ action_siglevdetcal() {
     # Parse the selected logic to get RX section
     local rx_section="${selected_logic##*|}"
     
+    if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
     # Stop svxlink service
     clear
     echo "=== Stopping svxlink service ==="
     systemctl stop svxlink.service
     sleep 2
-    
+fi
+
     # Run siglevdetcal
     echo "=== Running siglevdetcal $conf $rx_section (Ctrl+C to stop) ==="
     echo ""
@@ -954,12 +947,7 @@ action_siglevdetcal() {
         siglevdetcal "$conf" "$rx_section"
     )
     
-    # Restart svxlink service
-    echo ""
-    echo "=== Restarting svxlink service ==="
-    systemctl start svxlink.service
-    sleep 2
-    
+    echo "=== Don't forget to Restart svxlink service ==="
     echo "Done! Press Enter to return to menu..."
     read -r
 }
@@ -991,11 +979,11 @@ main_menu() {
         "5"  "$(printf "%-${W}s" "Follow live logs")"
         "6"  "$(printf "%-${W}s" "System health check")"
         "─"  "$(printf "%-${W}s" "─── Configuration ──────")"
-        "7"  "$(printf "%-${W}s" "Edit config file")"
+        "7"  "$(printf "%-${W}s" "Edit main config files")"
         "8"  "$(printf "%-${W}s" "Edit environment defaults")"
-        "9"  "$(printf "%-${W}s" "Edit event scripts (.tcl)")"
+        "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
         "10" "$(printf "%-${W}s" "Edit modules config")"
-        "11" "$(printf "%-${W}s" "Edit module TCL files")"
+        "11" "$(printf "%-${W}s" "Edit_modules event scripts (.tcl)")"
         "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
         "12" "$(printf "%-${W}s" "Alsamixer")"
         "13" "$(printf "%-${W}s" "Audio Calibration Tool")"
@@ -1013,14 +1001,14 @@ main_menu() {
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-label "Quit" \
-            --menu "\nChoose an action:\n" 37 50 28 \
+            --menu "\nChoose an action:\n" 35 50 26 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     else
         whiptail \
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-button "Quit" \
-            --menu "\nChoose an action:\n" 37 50 28 \
+            --menu "\nChoose an action:\n" 35 50 26 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     fi
 }
@@ -1044,7 +1032,7 @@ while true; do
         8)  action_edit_env ;;
         9)  action_edit_events ;;
         10) action_edit_modules_config ;;
-        11) action_edit_module_tcl_files ;;
+        11) action_edit_module_event_files ;;
         12) action_alsamixer ;;
         13) action_devcal_sections ;;
         14) action_siglevdetcal ;;
