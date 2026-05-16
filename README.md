@@ -70,7 +70,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v2.4.5  ────────────┐
+┌──────────── Svx Admin v2.6.6  ────────────┐
 │                                           │
 │  Choose an action:                        │
 │ ┌───────────────────────────────────────┐ │
@@ -84,17 +84,19 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │  ─  ─── Configuration ──────          │ │
 │ │  7  Edit config file                  │ │
 │ │  8  Edit environment defaults         │ │
-│ │  9  Edit event scripts (.tcl)         │ │
+│ │  9  Edit main event scripts (.tcl)    │ │
+| | 10  Edit modules config               | |
+| | 11  Edit modules event scripts (.tcl) | |
 │ │  ─  ─── Audio ──────────────          │ │
-│ │ 10  Alsamixer                         │ │
-│ │ 11  Audio Calibration tool            │ │
-│ │ 12  Signal Level Detector Calibration │ │
+│ │ 12  Alsamixer                         │ │
+│ │ 13  Audio Calibration tool            │ │
+│ │ 14  Signal Level Detector Calibration │ │
 │ │  ─  ─── Maintenance ────────          │ │
-│ │ 13  Check log rotation                │ │
+│ │ 15  Check log rotation                │ │
 │ │  ─  ────── Boot  ───────────          │ │
-│ │ 14  Enable service at boot            │ │
-│ │ 15  Disable service at boot           │ │
-| | 16  Reboot Computer                   | | 
+│ │ 16  Enable service at boot            │ │
+│ │ 17  Disable service at boot           │ │
+| | 18  Reboot Computer                   | | 
 │ └───────────────────────────────────────┘ │
 │          <OK>          <Quit>             │
 └───────────────────────────────────────────┘
@@ -109,11 +111,19 @@ SvxLink configuration files are typically located in:
 - [**SVXReflector config**:]( http://svxlink.org/doc/man/man5/svxreflector.conf.5.html)`/etc/svxlink/svxreflector.conf`
 - **GPIO config**: `/etc/svxlink/gpio.conf`
 - **Environment**: `/etc/default/`
-- **Event scripts**: `/usr/share/svxlink/events.d/` and `/usr/share/svxlink/events.d/local/`
+- [**Main Event scripts**:](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System) `/usr/share/svxlink/events.d/` and `/usr/share/svxlink/events.d/local/`
+- **Modules config**: `/etc/svxlink/svxlink.d/`
+                    - [Module_Help:](https://www.svxlink.org/doc/man/man5/ModuleHelp.conf.5.html)
+                    - [Module_Echolink:](https://www.svxlink.org/doc/man/man5/ModuleEchoLink.conf.5.html)
+                    - [Module_Parrot:](https://www.svxlink.org/doc/man/man5/ModuleParrot.conf.5.html)
+                    - [Module_TCLVoiceMail:](https://www.svxlink.org/doc/man/man5/ModuleTclVoiceMail.conf.5.html)
+                    - [Module_DTMFrepeater:]( https://www.svxlink.org/doc/man/man5/ModuleDtmfRepeater.conf.5.html)
+                    - [Module_PropagationMonitor:](https://www.svxlink.org/doc/man/man5/ModulePropagationMonitor.conf.5.html)
+                    - [Module_SelCallEnc:](https://www.svxlink.org/doc/man/man5/ModuleSelCallEnc.conf.5.html)
+  
+Use the "Edit main config file" & Edit Modules config menu option for safe editing of main configuration files. Click on the above config file for detailed configuration options.
 
-Use the "Edit config file" menu option for safe editing. Click on the above config file for detailed configuration options.
-
-Use the "Edit events scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
+Use the "Edit main events scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
 
 ## Troubleshooting
 
