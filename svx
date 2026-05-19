@@ -132,6 +132,10 @@ readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly MODULES_DIR="/etc/svxlink/svxlink.d/"
 
+# --- System Info Cache ---
+SYSINFO_CACHE=""
+SYSINFO_LAST_UPDATE=0
+
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
     local st
@@ -164,8 +168,17 @@ build_status_title() {
     echo "$title"
 }
 
-# Build system info string for the title bar
+# Build system info string for the title bar with caching and 1-second refresh
 build_sysinfo() {
+    local now
+    now=$(date +%s)
+    
+    # Return cached value if less than 1 second old
+    if [[ $((now - SYSINFO_LAST_UPDATE)) -lt 1 ]] && [[ -n "$SYSINFO_CACHE" ]]; then
+        echo "$SYSINFO_CACHE"
+        return
+    fi
+    
     local info=""
 
     # CPU temperature
@@ -186,6 +199,10 @@ build_sysinfo() {
     last_boot=$(uptime -s 2>/dev/null) || true
     [[ -n "$last_boot" ]] && info+="  Since ${last_boot%:*}"
 
+    # Update cache
+    SYSINFO_CACHE="$info"
+    SYSINFO_LAST_UPDATE=$now
+    
     echo "$info"
 }
 
