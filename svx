@@ -850,20 +850,20 @@ fi
     if [[ "$flag" == -r ]]; then
     echo "== Recommended setup for measurement:"
     echo " Please set a RF signal generator on the Frequency you are using at 2400 Hz deviation "
-    echo "    1. Adjust level using Alsamixer so tone dev to as close as you can to 2400 Hz (coarce ajustment)"
+    echo "    1. Adjust level using Alsamixer so tone dev is as close as you can to 2400 Hz (coarce adjustment)"
     echo "    2. Adjust level using + or - in devcal (fine adjustment)"
-    echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
+    echo "    3. Put the PREAMP= dB level into your svxlink.conf in the relevent RX section."
     else
     echo "== Recommended setup for measurement:"
     echo "   - Hit T on keyboard to transmit"
     echo "   - Use a deviation meter if available OR"
     echo "   - Use the Bessel 0 Null method:"
     echo "       1. Devcal will apply a sinusoidal modulating tone of 1000 Hz at 2404 Hz deviation."
+    echo "       2. Using an SSB receiver, tune to the carrier frequency -1 kHz"
     echo "       2. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
-    echo"        3. Adjust the modulation until the carrier is minimized."
-    echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
+    echo "       3. Adjust the modulation until the carrier is minimized."
+    echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf in the relevent TX section" 
     echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12.35 dBFS."
-    echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
     fi
     echo ""
     (
