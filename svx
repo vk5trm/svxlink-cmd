@@ -848,10 +848,22 @@ fi
     # Run devcal
     echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
     if [[ "$flag" == -r ]]; then
-    echo " Please set a RF signal generator on the Frequency you are using at 2.4khz deviation "
+    echo "== Recommended setup for measurement:"
+    echo " Please set a RF signal generator on the Frequency you are using at 2400 Hz deviation "
+    echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
+    echo "    2. Adjust level using + or - in devcal (fine adjustment)"
+    echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
     else
-    echo " Please set up a Deviation meter on the Frequency you are using at 2.4khz deviation or "
-    echo " use the Bessel 0 Null method using an ssb reciever. (do a search on the internet for info)"
+    echo "== Recommended setup for measurement:"
+    echo "   - Hit T on keyboard to transmit"
+    echo "   - Use a deviation meter if available OR"
+    echo "   - Use the Bessel 0 Null method:"
+    echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
+    echo "       2. Adjust the modulation until the carrier is minimized."
+    echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
+    echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
+    echo "       5. This corresponds to a frequency deviation of 2404 Hz."
+    echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
     fi
     echo ""
     (
