@@ -850,20 +850,20 @@ fi
     if [[ "$flag" == -r ]]; then
     echo "== Recommended setup for measurement:"
     echo " Please set a RF signal generator on the Frequency you are using at 2400 Hz deviation "
-    echo "    1. Adjust level using Alsamixer so tone dev is as close as you can to 2400 Hz (coarce adjustment)"
+    echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
     echo "    2. Adjust level using + or - in devcal (fine adjustment)"
-    echo "    3. Put the PREAMP= dB level into your svxlink.conf in the relevent RX section."
+    echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
     else
     echo "== Recommended setup for measurement:"
     echo "   - Hit T on keyboard to transmit"
     echo "   - Use a deviation meter if available OR"
     echo "   - Use the Bessel 0 Null method:"
-    echo "       1. Devcal will apply a sinusoidal modulating tone of 1000 Hz at 2404 Hz deviation."
-    echo "       2. Using an SSB receiver, tune to the carrier frequency -1 kHz"
-    echo "       2. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
-    echo "       3. Adjust the modulation until the carrier is minimized."
-    echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf in the relevent TX section" 
-    echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12.35 dBFS."
+    echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
+    echo "       2. Adjust the modulation until the carrier is minimized."
+    echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
+    echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
+    echo "       5. This corresponds to a frequency deviation of 2404 Hz."
+    echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
     fi
     echo ""
     (
@@ -871,9 +871,7 @@ fi
         devcal ${flag} "$conf" "$section"
     )
     
-    echo "=== Don't forget to Restart svxlink service ==="
-    echo "Done! Press Enter to return to menu..."
-    read -r
+    show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
 # =============================================================================
@@ -965,9 +963,7 @@ fi
         siglevdetcal "$conf" "$rx_section"
     )
     
-    echo "=== Don't forget to Restart svxlink service ==="
-    echo "Done! Press Enter to return to menu..."
-    read -r
+    show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
 action_reboot() {
