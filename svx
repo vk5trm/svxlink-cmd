@@ -847,6 +847,12 @@ action_devcal_sections() {
 fi
     # Run devcal
     echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
+    if [[ "$flag" == -r ]]; then
+    echo " Please set a RF signal generator on the Frequency you are using at 2.4khz deviation "
+    else
+    echo " Please set up a Deviation meter on the Frequency you are using at 2.4khz deviation or "
+    echo " use the Bessel 0 Null method using an ssb reciever. (do a search on the internet for info)"
+    fi
     echo ""
     (
         trap 'exit 0' INT
