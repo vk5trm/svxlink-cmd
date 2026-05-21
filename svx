@@ -997,7 +997,7 @@ main_menu() {
         "7"  "$(printf "%-${W}s" "Edit main config files")"
         "8"  "$(printf "%-${W}s" "Edit environment defaults")"
         "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
-        "10" "$(printf "%-${W}s" "Edit modules config")"
+        "10" "$(printf "%-${W}s" "Edit modules config files")"
         "11" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
         "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
         "12" "$(printf "%-${W}s" "Alsamixer")"
