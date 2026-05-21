@@ -853,7 +853,7 @@ fi
     echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
     echo "    2. Adjust level using + or - in devcal (fine adjustment)"
     echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
-    echo "    4. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9dBFS at 3500 Hz deviation."
+    echo "    4. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
     else
     echo "== Recommended setup for measurement:"
     echo "   - Hit T on keyboard to transmit"
@@ -863,7 +863,7 @@ fi
     echo "       2. Adjust the modulation until the carrier is minimized."
     echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
     echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
-    echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9dBFS at 3500 Hz deviation." 
+    echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation." 
     echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
     fi
     echo ""
