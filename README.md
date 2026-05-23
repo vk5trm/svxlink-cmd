@@ -34,7 +34,6 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
 - `svxlink.service` — Main repeater controller
 - `remotetrx.service` — Remote transceiver
 - `svxreflector.service` — Reflector/conference server
-- `svxlink_gpio_setup.service` — GPIO pin setup
 
 ## Requirements
 
@@ -70,7 +69,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v2.6.6  ────────────┐
+┌──────────── Svx Admin v2.6.7  ────────────┐
 │                                           │
 │  Choose an action:                        │
 │ ┌───────────────────────────────────────┐ │
@@ -109,7 +108,6 @@ SvxLink configuration files are typically located in:
 - [**SVXLink config**:](https://www.svxlink.org/doc/man/man5/svxlink.conf.5.html) `/etc/svxlink/svxlink.conf`
 - [**RemoteTRX config**:](http://svxlink.org/doc/man/man5/remotetrx.conf.5.html) `/etc/svxlink/remotetrx.conf`
 - [**SVXReflector config**:]( http://svxlink.org/doc/man/man5/svxreflector.conf.5.html)`/etc/svxlink/svxreflector.conf`
-- **GPIO config**: `/etc/svxlink/gpio.conf`
 - **Environment**: `/etc/default/`
 - [**Main Event scripts**:](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System) `/usr/share/svxlink/events.d/` and `/usr/share/svxlink/events.d/local/`
 - **Modules config**: `/etc/svxlink/svxlink.d/`
