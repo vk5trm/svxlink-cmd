@@ -97,34 +97,30 @@ fi
 EDITOR="${EDITOR:-$(command -v nano || command -v vi || echo "vi")}"
 
 # --- Services ---
-readonly SERVICES=("svxlink" "remotetrx" "svxreflector" "svxlink_gpio_setup")
+readonly SERVICES=("svxlink" "remotetrx" "svxreflector")
 
 declare -A SERVICE_LABELS=(
     [svxlink]="SvxLink"
     [remotetrx]="RemoteTRX"
     [svxreflector]="SvxReflector"
-    [svxlink_gpio_setup]="GPIO setup"
 )
 
 declare -A CONFIG_FILES=(
     [svxlink]="/etc/svxlink/svxlink.conf"
     [remotetrx]="/etc/svxlink/remotetrx.conf"
     [svxreflector]="/etc/svxlink/svxreflector.conf"
-    [svxlink_gpio_setup]="/etc/svxlink/gpio.conf"
 )
 
 declare -A ENV_FILES=(
     [svxlink]="/etc/default/svxlink"
     [remotetrx]="/etc/default/remotetrx"
     [svxreflector]="/etc/default/svxreflector"
-    [svxlink_gpio_setup]="/etc/default/gpio"
 )
 
 declare -A LOG_FILES=(
     [svxlink]="/var/log/svxlink"
     [remotetrx]="/var/log/remotetrx"
     [svxreflector]="/var/log/svxreflector"
-    [svxlink_gpio_setup]="/var/log/gpio"
 )
 
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
