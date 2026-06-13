@@ -94,7 +94,7 @@ THEME
 fi
 
 # --- Editor detection ---
-EDITOR="${EDITOR:-$(command -v nano || command -v vi || echo \"vi\")}"
+EDITOR="${EDITOR:-$(command -v nano || command -v vi || echo "vi")}"
 
 # --- Services ---
 readonly SERVICES=("svxlink" "remotetrx" "svxreflector")
@@ -199,7 +199,7 @@ pick_service() {
     for svc in "${SERVICES[@]}"; do
         local status
         status=$(get_service_status "$svc")
-        items+=("$i" "$(printf \"%-14s(%s)\" \"${SERVICE_LABELS[$svc]}\" \"$status\")")
+        items+=("$i" "$(printf "%-14s(%s)" "${SERVICE_LABELS[$svc]}" "$status")")
         ((i++))
     done
 
@@ -269,9 +269,9 @@ action_logs() {
     pick_service "Follow logs for:" || return
     local svc="$PICKED_SERVICE"
     local logfile="${LOG_FILES[$svc]}"
-    local log_items=("journald" "$(printf \"%-12s%s\" \"journalctl\" \"-u ${svc}.service\")")
+    local log_items=("journald" "$(printf "%-12s%s" "journalctl" "-u ${svc}.service")")
     if [[ -f "$logfile" ]]; then
-        log_items+=("file" "$(printf \"%-12s%s\" \"tail -f\" \"${logfile}\")")
+        log_items+=("file" "$(printf "%-12s%s" "tail -f" "${logfile}")")
     fi
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -288,7 +288,7 @@ action_logs() {
     source=$(<"$DIALOG_OUT")
     clear
     echo "=== Following logs for ${SERVICE_LABELS[$svc]} (Ctrl+C to return) ==="
-    echo \"\"
+    echo ""
     (
         trap 'exit 0' INT
         if [[ "$source" == "journald" ]]; then
@@ -315,170 +315,7 @@ action_edit_env() {
 }
 
 # =============================================================================
-# NEW FUNCTION: List and Switch Voices from Git Repository added by VK5TRM
-# =============================================================================
-
-action_list_voices() {
-    # Check if git is available
-    if ! command -v git &>/dev/null; then
-        show_result "Error" "git is not installed.\n\nInstall it with:\n  apt install git"
-        return
-    fi
-
-    # Prompt for git repository URL
-    local repo_url
-    if [[ "$DIALOG" == "dialog" ]]; then
-        repo_url=$(dialog \
-            --stdout \
-            --title " Enter Git Repository " \
-            --inputbox "\nEnter the git repository URL for voices:\n" \
-            10 70 \
-            "https://github.com/username/voices.git")
-    else
-        repo_url=$(whiptail \
-            --inputbox "\nEnter the git repository URL for voices:\n" \
-            10 70 \
-            "https://github.com/username/voices.git" \
-            3>&1 1>&2 2>&3)
-    fi
-
-    # Cancelled
-    [[ $? -eq 0 ]] || return
-
-    # Empty URL
-    if [[ -z "$repo_url" ]]; then
-        show_result "Error" "Repository URL cannot be empty."
-        return
-    fi
-
-    clear
-    echo "=== Fetching available voices from repository ==="
-    echo "Repository: $repo_url"
-    echo \"\"
-
-    # Create a temporary directory for git operations
-    local temp_repo
-    temp_repo=$(mktemp -d) || {
-        show_result "Error" "Failed to create temporary directory"
-        return
-    }
-
-    trap 'rm -rf "$temp_repo"' RETURN
-
-    # Fetch the repository branches
-    if ! git clone --quiet --bare "$repo_url" "$temp_repo" 2>/dev/null; then
-        show_result "Error" "Failed to clone repository.\n\nCheck the URL and your network connection."
-        return
-    fi
-
-    # Get list of branches (voices)
-    local -a voices=()
-    while IFS= read -r branch; do
-        # Remove refs/heads/ prefix
-        branch="${branch#refs/heads/}"
-        voices+=("$branch")
-    done < <(git --git-dir="$temp_repo" for-each-ref refs/heads/ --format='%(refname)')
-
-    if [[ ${#voices[@]} -eq 0 ]]; then
-        show_result "No Voices Found" "No branches (voices) found in the repository."
-        return
-    fi
-
-    # Build menu items
-    local -a menu_items=()
-    local idx=1
-    for voice in "${voices[@]}"; do
-        menu_items+=("$idx" "$voice")
-        ((idx++))
-    done
-
-    # Display voices menu
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Available Voices " \
-            --menu "\nSelect a voice to display details:\n" 16 70 "${#menu_items[@]}" \
-            "${menu_items[@]}" 2>"$DIALOG_OUT" || return
-    else
-        whiptail --title " Available Voices " \
-            --menu "\nSelect a voice to display details:\n" 16 70 "${#menu_items[@]}" \
-            "${menu_items[@]}" 2>"$DIALOG_OUT" || return
-    fi
-
-    local choice
-    choice=$(<"$DIALOG_OUT")
-
-    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return
-    fi
-
-    local selected_voice="${voices[$((choice - 1))]}"
-
-    # Show voice info
-    local info="Selected voice: $selected_voice\n\n"
-    info+="Commit: $(git --git-dir=\"$temp_repo\" rev-parse refs/heads/\"$selected_voice\" 2>/dev/null | cut -c1-8)\n"
-    info+="\nDo you want to switch to this voice using 'git checkout'?"
-
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Switch Voice? " \
-            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
-    else
-        whiptail --title " Switch Voice? " \
-            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
-    fi
-
-    if [[ $? -eq 0 ]]; then
-        action_switch_voice "$selected_voice"
-    fi
-}
-
-action_switch_voice() {
-    local voice_name="${1:-}"
-
-    if [[ -z "$voice_name" ]]; then
-        show_result "Error" "No voice specified."
-        return
-    fi
-
-    # Check if git is available
-    if ! command -v git &>/dev/null; then
-        show_result "Error" "git is not installed."
-        return
-    fi
-
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir &>/dev/null; then
-        show_result "Error" "Not in a git repository.\n\nPlease run this from your voices repository directory."
-        return
-    fi
-
-    clear
-    echo "=== Switching to voice: $voice_name ==="
-    echo \"\"
-
-    # Confirm the action
-    read -rp "Are you sure you want to checkout '$voice_name'? (yes/no): " confirm
-    if [[ "$confirm" != "yes" ]]; then
-        echo "Cancelled."
-        read -rp "Press Enter to continue..."
-        return
-    fi
-
-    # Perform git checkout
-    if git checkout "$voice_name" 2>&1; then
-        echo \"\"
-        echo "✓ Successfully switched to voice: $voice_name"
-        echo \"\"
-        echo "The following files were updated:"
-        git log -1 --oneline "$voice_name"
-        read -rp "Press Enter to continue..."
-    else
-        echo \"\"
-        echo "✗ Failed to switch to voice: $voice_name"
-        read -rp "Press Enter to continue..."
-    fi
-}
-
-# =============================================================================
-# Edit Event Script Actions added by VK5TRM
+# NEW FUNCTION: Edit Event Script Actions added by VK5TRM
 # =============================================================================
 
 action_edit_events() {
@@ -547,7 +384,7 @@ action_edit_events() {
         cmd="whiptail --title ' Select Event Script ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
     fi
     
-    cmd="$cmd $(printf '%q ' \"${menu_items[@]}\") 2>'$DIALOG_OUT'"
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
     eval "$cmd" || return
 
     local choice
@@ -575,12 +412,12 @@ action_edit_events() {
     original_filename=$(basename "$selected_file")
 
     local temp_file
-    temp_file=$(mktemp \"/run/${original_filename}.XXXXXX\") || {
+    temp_file=$(mktemp "/run/${original_filename}.XXXXXX") || {
         show_result "Error" "Failed to create temporary file"
         return
     }
 
-    trap 'rm -f \"$temp_file\"' RETURN
+    trap 'rm -f "$temp_file"' RETURN
 
     if ! cp "$selected_file" "$temp_file"; then
         show_result "Error" "Failed to prepare temporary file"
@@ -596,9 +433,9 @@ action_edit_events() {
 
     local save_name
     if [[ "$DIALOG" == "dialog" ]]; then
-        save_name=$(dialog --stdout --title \" Save Event Script \" --inputbox \"\nSave as filename::\" 10 60 \"$original_filename\")
+        save_name=$(dialog --stdout --title " Save Event Script " --inputbox "\nSave as filename:" 10 60 "$original_filename")
     else
-        save_name=$(whiptail --inputbox \"\nSave as filename:\" 10 60 \"$original_filename\" 3>&1 1>&2 2>&3)
+        save_name=$(whiptail --inputbox "\nSave as filename:" 10 60 "$original_filename" 3>&1 1>&2 2>&3)
     fi
 
     [[ $? -eq 0 ]] || return
@@ -663,7 +500,7 @@ action_edit_config() {
         cmd="whiptail --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
     fi
     
-    cmd="$cmd $(printf '%q ' \"${menu_items[@]}\") 2>'$DIALOG_OUT'"
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
     eval "$cmd" || return
 
     local choice
@@ -725,7 +562,7 @@ action_edit_module_event_files() {
         cmd="whiptail --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
     fi
     
-    cmd="$cmd $(printf '%q ' \"${menu_items[@]}\") 2>'$DIALOG_OUT'"
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
     eval "$cmd" || return
 
     local choice
@@ -743,6 +580,169 @@ action_edit_module_event_files() {
     fi
 
     $EDITOR "$selected_file"
+}
+
+# =============================================================================
+# NEW FUNCTION: List and Switch Voices from Git Repository added by VK5TRM
+# =============================================================================
+
+action_list_voices() {
+    # Check if git is available
+    if ! command -v git &>/dev/null; then
+        show_result "Error" "git is not installed.\n\nInstall it with:\n  apt install git"
+        return
+    fi
+
+    # Prompt for git repository URL
+    local repo_url
+    if [[ "$DIALOG" == "dialog" ]]; then
+        repo_url=$(dialog \
+            --stdout \
+            --title " Enter Git Repository " \
+            --inputbox "\nEnter the git repository URL for voices:\n" \
+            10 70 \
+            "https://github.com/username/voices.git")
+    else
+        repo_url=$(whiptail \
+            --inputbox "\nEnter the git repository URL for voices:\n" \
+            10 70 \
+            "https://github.com/username/voices.git" \
+            3>&1 1>&2 2>&3)
+    fi
+
+    # Cancelled
+    [[ $? -eq 0 ]] || return
+
+    # Empty URL
+    if [[ -z "$repo_url" ]]; then
+        show_result "Error" "Repository URL cannot be empty."
+        return
+    fi
+
+    clear
+    echo "=== Fetching available voices from repository ==="
+    echo "Repository: $repo_url"
+    echo ""
+
+    # Create a temporary directory for git operations
+    local temp_repo
+    temp_repo=$(mktemp -d) || {
+        show_result "Error" "Failed to create temporary directory"
+        return
+    }
+
+    trap 'rm -rf "$temp_repo"' RETURN
+
+    # Fetch the repository branches
+    if ! git clone --quiet --bare "$repo_url" "$temp_repo" 2>/dev/null; then
+        show_result "Error" "Failed to clone repository.\n\nCheck the URL and your network connection."
+        return
+    fi
+
+    # Get list of branches (voices)
+    local -a voices=()
+    while IFS= read -r branch; do
+        # Remove refs/heads/ prefix
+        branch="${branch#refs/heads/}"
+        voices+=("$branch")
+    done < <(git --git-dir="$temp_repo" for-each-ref refs/heads/ --format='%(refname)')
+
+    if [[ ${#voices[@]} -eq 0 ]]; then
+        show_result "No Voices Found" "No branches (voices) found in the repository."
+        return
+    fi
+
+    # Build menu items
+    local -a menu_items=()
+    local idx=1
+    for voice in "${voices[@]}"; do
+        menu_items+=("$idx" "$voice")
+        ((idx++))
+    done
+
+    # Display voices menu
+    if [[ "$DIALOG" == "dialog" ]]; then
+        dialog --colors --no-shadow --title " Available Voices " \
+            --menu "\nSelect a voice to display details:\n" 16 70 "${#menu_items[@]}" \
+            "${menu_items[@]}" 2>"$DIALOG_OUT" || return
+    else
+        whiptail --title " Available Voices " \
+            --menu "\nSelect a voice to display details:\n" 16 70 "${#menu_items[@]}" \
+            "${menu_items[@]}" 2>"$DIALOG_OUT" || return
+    fi
+
+    local choice
+    choice=$(<"$DIALOG_OUT")
+
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return
+    fi
+
+    local selected_voice="${voices[$((choice - 1))]}"
+
+    # Show voice info
+    local info="Selected voice: $selected_voice\n\n"
+    info+="Commit: $(git --git-dir="$temp_repo" rev-parse refs/heads/"$selected_voice" 2>/dev/null | cut -c1-8)\n"
+    info+="\nDo you want to switch to this voice using 'git checkout'?"
+
+    if [[ "$DIALOG" == "dialog" ]]; then
+        dialog --colors --no-shadow --title " Switch Voice? " \
+            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
+    else
+        whiptail --title " Switch Voice? " \
+            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
+    fi
+
+    if [[ $? -eq 0 ]]; then
+        action_switch_voice "$selected_voice"
+    fi
+}
+
+action_switch_voice() {
+    local voice_name="${1:-}"
+
+    if [[ -z "$voice_name" ]]; then
+        show_result "Error" "No voice specified."
+        return
+    fi
+
+    # Check if git is available
+    if ! command -v git &>/dev/null; then
+        show_result "Error" "git is not installed."
+        return
+    fi
+
+    # Check if we're in a git repository
+    if ! git rev-parse --git-dir &>/dev/null; then
+        show_result "Error" "Not in a git repository.\n\nPlease run this from your voices repository directory."
+        return
+    fi
+
+    clear
+    echo "=== Switching to voice: $voice_name ==="
+    echo ""
+
+    # Confirm the action
+    read -rp "Are you sure you want to checkout '$voice_name'? (yes/no): " confirm
+    if [[ "$confirm" != "yes" ]]; then
+        echo "Cancelled."
+        read -rp "Press Enter to continue..."
+        return
+    fi
+
+    # Perform git checkout
+    if git checkout "$voice_name" 2>&1; then
+        echo ""
+        echo "✓ Successfully switched to voice: $voice_name"
+        echo ""
+        echo "The following files were updated:"
+        git log -1 --oneline "$voice_name"
+        read -rp "Press Enter to continue..."
+    else
+        echo ""
+        echo "✗ Failed to switch to voice: $voice_name"
+        read -rp "Press Enter to continue..."
+    fi
 }
 
 action_alsamixer() {
@@ -810,9 +810,13 @@ action_check_logrotate() {
 
 action_health_check() {
     local report=""
+
+    # Disk usage
     report+="DISK USAGE\n"
     report+="$(df -h --output=target,size,used,avail,pcent / /boot 2>/dev/null | head -5)\n"
     report+="\n"
+
+    # Top 10 CPU consuming processes
     report+="TOP 10 PROCESSES (CPU)\n"
     report+="$(ps -eo pid,user,%cpu,%mem,comm --sort=-%cpu | head -11)\n"
 
@@ -825,124 +829,242 @@ action_health_check() {
     fi
 }
 
+# =============================================================================
+# NEW FUNCTION: devcal with Section Selection added by VK5TRM
+# =============================================================================
+
 action_devcal_sections() {
     local conf="${CONFIG_FILES[svxlink]}"
-    [[ -f "$conf" ]] || { show_result "Error" "Config file not found:\n${conf}"; return; }
-
+    
+    if [[ ! -f "$conf" ]]; then
+        show_result "Error" "Config file not found:\n${conf}"
+        return
+    fi
+    
+    # Extract all RepeaterLogic and SimplexLogic section names with their RX and TX values
     local logics=()
-    local current_section="" current_rx="" current_tx=""
+    local current_section=""
+    local current_rx=""
+    local current_tx=""
     
     while IFS= read -r line; do
+        # Check if this is a RepeaterLogic or SimplexLogic section header
         if [[ "$line" =~ ^\[(RepeaterLogic|SimplexLogic)[^]]*\] ]]; then
-            [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]] && logics+=("$current_section|$current_rx|$current_tx")
+            # Save previous section if it has RX and TX
+            if [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]]; then
+                logics+=("$current_section|$current_rx|$current_tx")
+            fi
+            # Start new section
             current_section="${BASH_REMATCH[0]}"
             current_section="${current_section%]}"
             current_section="${current_section#[}"
-            current_rx="" current_tx=""
+            current_rx=""
+            current_tx=""
+        # Extract RX value
         elif [[ "$line" =~ ^RX= ]]; then
-            current_rx="${line#RX=}" && current_rx="${current_rx// /}"
+            current_rx="${line#RX=}"
+            current_rx="${current_rx// /}"  # Remove spaces
+        # Extract TX value
         elif [[ "$line" =~ ^TX= ]]; then
-            current_tx="${line#TX=}" && current_tx="${current_tx// /}"
+            current_tx="${line#TX=}"
+            current_tx="${current_tx// /}"  # Remove spaces
         fi
     done < "$conf"
     
-    [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]] && logics+=("$current_section|$current_rx|$current_tx")
-    [[ ${#logics[@]} -eq 0 ]] && { show_result "No Logics Found" "No RepeaterLogic or SimplexLogic sections found in:\n${conf}"; return; }
-
+    # Don't forget the last section
+    if [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]]; then
+        logics+=("$current_section|$current_rx|$current_tx")
+    fi
+    
+    if [[ ${#logics[@]} -eq 0 ]]; then
+        show_result "No Logics Found" "No RepeaterLogic or SimplexLogic sections found in:\n${conf}"
+        return
+    fi
+    
+    # Create menu items from logics
     local items=()
     local i=1
     for logic in "${logics[@]}"; do
-        local section="${logic%%|*}" rx="${logic#*|}" tx="${logic##*|}"
+        local section="${logic%%|*}"
+        local rx="${logic#*|}"
         rx="${rx%%|*}"
+        local tx="${logic##*|}"
         items+=("$i" "$section (RX: $rx / TX: $tx)")
         ((i++))
     done
     
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Select Logic " \
-            --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" "${items[@]}" 2>"$DIALOG_OUT" || return
+            --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" \
+            "${items[@]}" 2>"$DIALOG_OUT" || return
     else
         whiptail --title " Select Logic " \
-            --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" "${items[@]}" 2>"$DIALOG_OUT" || return
+            --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" \
+            "${items[@]}" 2>"$DIALOG_OUT" || return
     fi
     
     local choice
     choice=$(<"$DIALOG_OUT")
     local selected_logic="${logics[$((choice - 1))]}"
     
-    local rx_section="${selected_logic#*|}" tx_section="${selected_logic##*|}"
+    # Parse the selected logic using pipe delimiter
+    local rx_section="${selected_logic#*|}"
     rx_section="${rx_section%%|*}"
+    local tx_section="${selected_logic##*|}"
     
-    local rxtx_items=("1" "RX: $rx_section" "2" "TX: $tx_section")
+    # Show RX/TX selection menu
+    local rxtx_items=(
+        "1" "RX: $rx_section"
+        "2" "TX: $tx_section"
+    )
     
     if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Select RX or TX " --menu "\nChoose which to calibrate:\n" 12 40 2 "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
+        dialog --colors --no-shadow --title " Select RX or TX " \
+            --menu "\nChoose which to calibrate:\n" 12 40 2 \
+            "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
     else
-        whiptail --title " Select RX or TX " --menu "\nChoose which to calibrate:\n" 12 40 2 "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
+        whiptail --title " Select RX or TX " \
+            --menu "\nChoose which to calibrate:\n" 12 40 2 \
+            "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
     fi
     
     local rxtx_choice
     rxtx_choice=$(<"$DIALOG_OUT")
     
-    local section flag
+    # Determine which section and flag to use
+    local section
+    local flag
     if [[ "$rxtx_choice" == "1" ]]; then
-        section="$rx_section" flag="-r"
+        section="$rx_section"
+        flag="-r"
     else
-        section="$tx_section" flag="-t"
+        section="$tx_section"
+        flag="-t"
     fi
-    
-    [[ $(systemctl is-active svxlink.service) == \"active\" ]] && { clear; echo \"=== Stopping svxlink service ==="; systemctl stop svxlink.service; sleep 2; }
-    
+    if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
+        clear
+        echo "=== Stopping svxlink service ==="
+        systemctl stop svxlink.service
+        sleep 2
+    fi
+    # Run devcal
     echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
-    [[ "$flag" == -r ]] && echo \"== Recommended setup for RX measurement:...\" || echo \"== Recommended setup for TX measurement:...\"
-    (trap 'exit 0' INT; devcal ${flag} "$conf" "$section")
+    if [[ "$flag" == -r ]]; then
+        echo "== Recommended setup for measurement:"
+        echo " Please set a RF signal generator on the Frequency you are using at 1000 Hz tone 2400 Hz deviation "
+        echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
+        echo "    2. Adjust level using + or - in devcal (fine adjustment)"
+        echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
+        echo "    4. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
+    else
+        echo "== Recommended setup for measurement:"
+        echo "   - Hit T on keyboard to transmit"
+        echo "   - Use a deviation meter if available OR"
+        echo "   - Use the Bessel 0 Null method:"
+        echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
+        echo "       2. Adjust the modulation until the carrier is minimized."
+        echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
+        echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
+        echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation." 
+        echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
+    fi
+    echo ""
+    (
+        trap 'exit 0' INT
+        devcal ${flag} "$conf" "$section"
+    )
+    
     show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
+# =============================================================================
+# NEW FUNCTION: siglevdetcal with Section Selection added by VK5TRM
+# =============================================================================
+
 action_siglevdetcal() {
     local conf="${CONFIG_FILES[svxlink]}"
-    [[ -f "$conf" ]] || { show_result "Error" "Config file not found:\n${conf}"; return; }
-
+    
+    if [[ ! -f "$conf" ]]; then
+        show_result "Error" "Config file not found:\n${conf}"
+        return
+    fi
+    
+    # Extract all RepeaterLogic and SimplexLogic section names with their RX values
     local logics=()
-    local current_section="" current_rx=""
+    local current_section=""
+    local current_rx=""
     
     while IFS= read -r line; do
+        # Check if this is a RepeaterLogic or SimplexLogic section header
         if [[ "$line" =~ ^\[(RepeaterLogic|SimplexLogic)[^]]*\] ]]; then
-            [[ -n "$current_section" && -n "$current_rx" ]] && logics+=("$current_section|$current_rx")
-            current_section="${BASH_REMATCH[0]}" && current_section="${current_section%]}" && current_section="${current_section#[}"
+            # Save previous section if it has RX
+            if [[ -n "$current_section" && -n "$current_rx" ]]; then
+                logics+=("$current_section|$current_rx")
+            fi
+            # Start new section
+            current_section="${BASH_REMATCH[0]}"
+            current_section="${current_section%]}"
+            current_section="${current_section#[}"
             current_rx=""
+        # Extract RX value
         elif [[ "$line" =~ ^RX= ]]; then
-            current_rx="${line#RX=}" && current_rx="${current_rx// /}"
+            current_rx="${line#RX=}"
+            current_rx="${current_rx// /}"  # Remove spaces
         fi
     done < "$conf"
     
-    [[ -n "$current_section" && -n "$current_rx" ]] && logics+=("$current_section|$current_rx")
-    [[ ${#logics[@]} -eq 0 ]] && { show_result "No RX Found" "No RX sections found in:\n${conf}"; return; }
-
+    # Don't forget the last section
+    if [[ -n "$current_section" && -n "$current_rx" ]]; then
+        logics+=("$current_section|$current_rx")
+    fi
+    
+    if [[ ${#logics[@]} -eq 0 ]]; then
+        show_result "No RX Found" "No RX sections found in logic configurations in:\n${conf}"
+        return
+    fi
+    
+    # Create menu items from logics
     local items=()
     local i=1
     for logic in "${logics[@]}"; do
-        local section="${logic%%|*}" rx="${logic##*|}"
+        local section="${logic%%|*}"
+        local rx="${logic##*|}"
         items+=("$i" "$section - RX: $rx")
         ((i++))
     done
     
     if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Select RX " --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" "${items[@]}" 2>"$DIALOG_OUT" || return
+        dialog --colors --no-shadow --title " Select RX " \
+            --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" \
+            "${items[@]}" 2>"$DIALOG_OUT" || return
     else
-        whiptail --title " Select RX " --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" "${items[@]}" 2>"$DIALOG_OUT" || return
+        whiptail --title " Select RX " \
+            --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" \
+            "${items[@]}" 2>"$DIALOG_OUT" || return
     fi
     
     local choice
     choice=$(<"$DIALOG_OUT")
     local selected_logic="${logics[$((choice - 1))]}"
+    
+    # Parse the selected logic to get RX section
     local rx_section="${selected_logic##*|}"
     
-    [[ $(systemctl is-active svxlink.service) == \"active\" ]] && { clear; echo \"=== Stopping svxlink service ==="; systemctl stop svxlink.service; sleep 2; }
-    
+    if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
+        clear
+        echo "=== Stopping svxlink service ==="
+        systemctl stop svxlink.service
+        sleep 2
+    fi
+
+    # Run siglevdetcal
     echo "=== Running siglevdetcal $conf $rx_section (Ctrl+C to stop) ==="
-    echo \"\"
-    (trap 'exit 0' INT; siglevdetcal "$conf" "$rx_section")
+    echo ""
+    (
+        trap 'exit 0' INT
+        siglevdetcal "$conf" "$rx_section"
+    )
+    
     show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
@@ -953,6 +1075,10 @@ action_reboot() {
     sleep 2
 }
 
+# =============================================================================
+# Main Menu
+# =============================================================================
+
 main_menu() {
     local status_title sysinfo
     status_title=$(build_status_title)
@@ -960,43 +1086,58 @@ main_menu() {
 
     local W=30
     local menu_items=(
-        \"1\"  \"$(printf \"%-${W}s\" \"Start service)\"
-        \"2\"  \"$(printf \"%-${W}s\" \"Stop service)\"
-        \"3\"  \"$(printf \"%-${W}s\" \"Restart service)\"
-        \"─\"  \"$(printf \"%-${W}s\" \"─── Monitoring ─────────)\"
-        \"4\"  \"$(printf \"%-${W}s\" \"Show detailed status)\"
-        \"5\"  \"$(printf \"%-${W}s\" \"Follow live logs)\"
-        \"6\"  \"$(printf \"%-${W}s\" \"System health check)\"
-        \"─\"  \"$(printf \"%-${W}s\" \"─── Configuration ──────)\"
-        \"7\"  \"$(printf \"%-${W}s\" \"Edit config files)\"
-        \"8\"  \"$(printf \"%-${W}s\" \"Edit environment defaults)\"
-        \"9\"  \"$(printf \"%-${W}s\" \"Edit main event scripts (.tcl))\"
-        \"10\" \"$(printf \"%-${W}s\" \"Edit modules event scripts (.tcl))\"
-        \"─\"  \"$(printf \"%-${W}s\" \"─── Audio ──────────────)\"
-        \"11\" \"$(printf \"%-${W}s\" \"Alsamixer)\"
-        \"12\" \"$(printf \"%-${W}s\" \"Audio Calibration Tool)\"
-        \"13\" \"$(printf \"%-${W}s\" \"Signal Level Detector Calibration)\"
-        \"─\"  \"$(printf \"%-${W}s\" \"─── Voices ─────────────)\"
-        \"18\" \"$(printf \"%-${W}s\" \"List and Switch Voices)\"
-        \"─\"  \"$(printf \"%-${W}s\" \"─── Maintenance ────────)\"
-        \"14\" \"$(printf \"%-${W}s\" \"Check log rotation)\"
-        \"─\"  \"$(printf \"%-${W}s\" \"───── Boot ─────────────)\"
-        \"15\" \"$(printf \"%-${W}s\" \"Enable service at boot)\"
-        \"16\" \"$(printf \"%-${W}s\" \"Disable service at boot)\"
-        \"17\" \"$(printf \"%-${W}s\" \"Reboot Computer)\"
+        "1"  "$(printf "%-${W}s" "Start service")"
+        "2"  "$(printf "%-${W}s" "Stop service")"
+        "3"  "$(printf "%-${W}s" "Restart service")"
+        "─"  "$(printf "%-${W}s" "─── Monitoring ─────────")"
+        "4"  "$(printf "%-${W}s" "Show detailed status")"
+        "5"  "$(printf "%-${W}s" "Follow live logs")"
+        "6"  "$(printf "%-${W}s" "System health check")"
+        "─"  "$(printf "%-${W}s" "─── Configuration ──────")"
+        "7"  "$(printf "%-${W}s" "Edit config files")"
+        "8"  "$(printf "%-${W}s" "Edit environment defaults")"
+        "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
+        "10" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
+        "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
+        "11" "$(printf "%-${W}s" "Alsamixer")"
+        "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
+        "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
+        "─"  "$(printf "%-${W}s" "─── Voices ─────────────")"
+        "18" "$(printf "%-${W}s" "List and Switch Voices")"
+        "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
+        "14" "$(printf "%-${W}s" "Check log rotation")"
+        "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
+        "15" "$(printf "%-${W}s" "Enable service at boot")"
+        "16" "$(printf "%-${W}s" "Disable service at boot")"
+        "17" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
-    if [[ \"$DIALOG\" == \"dialog\" ]]; then
-        dialog --colors --no-shadow --title \" $SCRIPT_NAME v$VERSION \" --backtitle \"$status_title | $sysinfo\" --cancel-label \"Quit\" --menu \"\nChoose an action:\n\" 35 50 28 \"${menu_items[@]}\" 2>\"$DIALOG_OUT\"
+    if [[ "$DIALOG" == "dialog" ]]; then
+        dialog --colors --no-shadow \
+            --title " $SCRIPT_NAME v$VERSION " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Quit" \
+            --menu "\nChoose an action:\n" 35 50 28 \
+            "${menu_items[@]}" 2>"$DIALOG_OUT"
     else
-        whiptail --title \" $SCRIPT_NAME v$VERSION \" --backtitle \"$status_title | $sysinfo\" --cancel-button \"Quit\" --menu \"\nChoose an action:\n\" 35 50 28 \"${menu_items[@]}\" 2>\"$DIALOG_OUT\"
+        whiptail \
+            --title " $SCRIPT_NAME v$VERSION " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-button "Quit" \
+            --menu "\nChoose an action:\n" 35 50 28 \
+            "${menu_items[@]}" 2>"$DIALOG_OUT"
     fi
 }
 
+# =============================================================================
+# Main Loop
+# =============================================================================
+
 while true; do
     main_menu || break
-    choice=$(cat \"$DIALOG_OUT\")
-    case \"$choice\" in
+
+    choice=$(cat "$DIALOG_OUT")
+    case "$choice" in
         1)  action_start ;;
         2)  action_stop ;;
         3)  action_restart ;;
@@ -1015,9 +1156,9 @@ while true; do
         16) action_disable ;;
         17) action_reboot ;;
         18) action_list_voices ;;
-         *)  ;;
+         *)  ;; # separator selected, ignore
     esac
 done
 
 clear
-echo \"Goodbye!\"
+echo "Goodbye!"
