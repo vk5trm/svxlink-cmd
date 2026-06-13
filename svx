@@ -126,7 +126,7 @@ declare -A LOG_FILES=(
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
-readonly MODULES_DIR="/etc/svxlink/svxlink.d/"
+readonly CONFIG_DIR="/etc/svxlink/"
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -302,17 +302,6 @@ action_logs() {
 # =============================================================================
 # Configuration Actions
 # =============================================================================
-
-action_edit_config() {
-    pick_service "Edit config for:" || return
-    local svc="$PICKED_SERVICE"
-    local conf="${CONFIG_FILES[$svc]}"
-    if [[ ! -f "$conf" ]]; then
-        show_result "Error" "Config file not found:\n${conf}"
-        return
-    fi
-    $EDITOR "$conf"
-}
 
 action_edit_env() {
     pick_service "Edit environment for:" || return
@@ -508,9 +497,9 @@ fi
 # NEW FUNCTION: Edit Modules Config added by VK5TRM
 # =============================================================================
 
-action_edit_modules_config() {
-    if [[ ! -d "$MODULES_DIR" ]]; then
-        show_result "Error" "Modules directory not found:\n${MODULES_DIR}"
+action_edit_config() {
+    if [[ ! -d "$CONFIG_DIR" ]]; then
+        show_result "Error" "Modules directory not found:\n${CONFIG_DIR}"
         return
     fi
 
@@ -519,15 +508,15 @@ action_edit_modules_config() {
     while IFS= read -r -d '' file; do
         conf_files+=("$file")
     done < <(
-        find "$MODULES_DIR" \
-            -maxdepth 1 \
+        find "$CONFIG_DIR" \
+            -maxdepth 2 \
             -type f \
             -name "*.conf" \
             -print0 | sort -z
     )
 
     if [[ ${#conf_files[@]} -eq 0 ]]; then
-        show_result "No Config Files" "No .conf files found in:\n${MODULES_DIR}"
+        show_result "No Config Files" "No .conf files found in:\n${CONFIG_DIR}"
         return
     fi
 
@@ -544,9 +533,9 @@ action_edit_modules_config() {
     # Display menu using eval for proper expansion
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
-        cmd="dialog --colors --no-shadow --title ' Select Module Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
+        cmd="dialog --colors --no-shadow --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
     else
-        cmd="whiptail --title ' Select Module Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
+        cmd="whiptail --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
     fi
     
     cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
@@ -990,21 +979,20 @@ main_menu() {
         "5"  "$(printf "%-${W}s" "Follow live logs")"
         "6"  "$(printf "%-${W}s" "System health check")"
         "─"  "$(printf "%-${W}s" "─── Configuration ──────")"
-        "7"  "$(printf "%-${W}s" "Edit main config files")"
+        "7"  "$(printf "%-${W}s" "Edit config files")"
         "8"  "$(printf "%-${W}s" "Edit environment defaults")"
         "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
-        "10" "$(printf "%-${W}s" "Edit modules config files")"
-        "11" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
+        "10" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
         "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
-        "12" "$(printf "%-${W}s" "Alsamixer")"
-        "13" "$(printf "%-${W}s" "Audio Calibration Tool")"
-        "14" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
+        "11" "$(printf "%-${W}s" "Alsamixer")"
+        "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
+        "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
         "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
-        "15" "$(printf "%-${W}s" "Check log rotation")"
+        "14" "$(printf "%-${W}s" "Check log rotation")"
         "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
-        "16" "$(printf "%-${W}s" "Enable service at boot")"
-        "17" "$(printf "%-${W}s" "Disable service at boot")"
-        "18" "$(printf "%-${W}s" "Reboot Computer")"
+        "15" "$(printf "%-${W}s" "Enable service at boot")"
+        "16" "$(printf "%-${W}s" "Disable service at boot")"
+        "17" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -1042,15 +1030,14 @@ while true; do
         7)  action_edit_config ;;
         8)  action_edit_env ;;
         9)  action_edit_events ;;
-        10) action_edit_modules_config ;;
-        11) action_edit_module_event_files ;;
-        12) action_alsamixer ;;
-        13) action_devcal_sections ;;
-        14) action_siglevdetcal ;;
-        15) action_check_logrotate ;;
-        16) action_enable ;;
-        17) action_disable ;;
-        18) action_reboot ;;
+        10) action_edit_module_event_files ;;
+        11) action_alsamixer ;;
+        12) action_devcal_sections ;;
+        13) action_siglevdetcal ;;
+        14) action_check_logrotate ;;
+        15) action_enable ;;
+        16) action_disable ;;
+        17) action_reboot ;;
          *)  ;; # separator selected, ignore
     esac
 done
