@@ -1108,13 +1108,13 @@ main_menu() {
         "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
         "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
         "─"  "$(printf "%-${W}s" "─── Voices ─────────────")"
-        "18" "$(printf "%-${W}s" "List and Switch Voices")"
+        "14" "$(printf "%-${W}s" "List and Switch Voices")"
         "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
-        "14" "$(printf "%-${W}s" "Check log rotation")"
+        "15" "$(printf "%-${W}s" "Check log rotation")"
         "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
-        "15" "$(printf "%-${W}s" "Enable service at boot")"
-        "16" "$(printf "%-${W}s" "Disable service at boot")"
-        "17" "$(printf "%-${W}s" "Reboot Computer")"
+        "16" "$(printf "%-${W}s" "Enable service at boot")"
+        "17" "$(printf "%-${W}s" "Disable service at boot")"
+        "18" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -1154,13 +1154,14 @@ while true; do
         9)  action_edit_events ;;
         10) action_edit_module_event_files ;;
         11) action_alsamixer ;;
-        12) action_devcal_sections ;;
+        12) action_devcal_sections ;;        
         13) action_siglevdetcal ;;
-        14) action_check_logrotate ;;
-        15) action_enable ;;
-        16) action_disable ;;
-        17) action_reboot ;;
-        18) action_list_voices ;;
+        14) action_list_voices ;;
+        15) action_check_logrotate ;;
+        16) action_enable ;;
+        17) action_disable ;;
+        18) action_reboot ;;
+        
          *)  ;; # separator selected, ignore
     esac
 done
