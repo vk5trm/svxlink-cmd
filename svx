@@ -459,7 +459,7 @@ action_edit_events() {
 }
 
 # =============================================================================
-# Edit Modules Config added by VK5TRM
+# Edit Config added by VK5TRM
 # =============================================================================
 
 action_edit_config() {
@@ -593,59 +593,13 @@ action_list_voices() {
         return
     fi
 
-    # Prompt for git repository URL
-    local repo_url
-    if [[ "$DIALOG" == "dialog" ]]; then
-        repo_url=$(dialog \
-            --stdout \
-            --title " Enter Git Repository " \
-            --inputbox "\nEnter the git repository URL for voices:\n" \
-            10 70 \
-            "https://github.com/username/voices.git")
-    else
-        repo_url=$(whiptail \
-            --inputbox "\nEnter the git repository URL for voices:\n" \
-            10 70 \
-            "https://github.com/username/voices.git" \
-            3>&1 1>&2 2>&3)
-    fi
-
-    # Cancelled
-    [[ $? -eq 0 ]] || return
-
-    # Empty URL
-    if [[ -z "$repo_url" ]]; then
-        show_result "Error" "Repository URL cannot be empty."
-        return
-    fi
-
-    clear
-    echo "=== Fetching available voices from repository ==="
-    echo "Repository: $repo_url"
-    echo ""
-
-    # Create a temporary directory for git operations
-    local temp_repo
-    temp_repo=$(mktemp -d) || {
-        show_result "Error" "Failed to create temporary directory"
-        return
-    }
-
-    trap 'rm -rf "$temp_repo"' RETURN
-
-    # Fetch the repository branches
-    if ! git clone --quiet --bare "$repo_url" "$temp_repo" 2>/dev/null; then
-        show_result "Error" "Failed to clone repository.\n\nCheck the URL and your network connection."
-        return
-    fi
-
     # Get list of branches (voices)
     local -a voices=()
     while IFS= read -r branch; do
         # Remove refs/heads/ prefix
         branch="${branch#refs/heads/}"
         voices+=("$branch")
-    done < <(git --git-dir="$temp_repo" for-each-ref refs/heads/ --format='%(refname)')
+    done < <(git --git-dir=/usr/share/svxlink/sounds for-each-ref refs/heads/ --format='%(refname)')
 
     if [[ ${#voices[@]} -eq 0 ]]; then
         show_result "No Voices Found" "No branches (voices) found in the repository."
