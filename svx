@@ -667,7 +667,7 @@ action_list_voices() {
     done < <(git --git-dir="$selected_dir/.git" for-each-ref refs/heads/ --format='%(refname)' 2>/dev/null)
 
     if [[ ${#voices[@]} -eq 0 ]]; then
-        show_result "No Voices Found" "No branches (voices) found in:\n${selected_dir}"
+        show_result "No Voices Found" "No branches (voices) found"
         return 1
     fi
 
