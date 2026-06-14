@@ -612,7 +612,7 @@ action_list_voices() {
     done < <(find "$SOUND_DIR" -maxdepth 1 -mindepth 1 -type d -print0 | sort -z)
 
     if [[ ${#DIRS[@]} -eq 0 ]]; then
-        show_result "No Config Files" "No Directories found in:\n${SOUND_DIR}"
+        show_result "No Directories found in:\n${SOUND_DIR}"
         return 1
     fi
 
