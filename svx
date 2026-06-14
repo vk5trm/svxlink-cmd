@@ -657,19 +657,22 @@ action_list_voices() {
         return 1
     fi
 
-    # Get list of branches (voices) from the selected directory
+     # Get list of branches (voices) from the selected directory
     local -a voices=()
-    # Fixed: Correctly expand $selected_dir and use proper git-dir syntax
     while IFS= read -r branch; do
         # Remove refs/heads/ prefix
-        branch="${branch#refs/heads/}"
+        branch="${branch#refs/heads/}"        
+       if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+            continue
+        fi
         voices+=("$branch")
     done < <(git --git-dir="$selected_dir/.git" for-each-ref refs/heads/ --format='%(refname)' 2>/dev/null)
 
     if [[ ${#voices[@]} -eq 0 ]]; then
-        show_result "No Voices Found" "No branches (voices) found"
+        show_result "No Voices Found" "No custom branches found."
         return 1
     fi
+
 
     # Build menu items for voices
     local -a voice_menu_items=()
