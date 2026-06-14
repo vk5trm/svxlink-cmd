@@ -1111,7 +1111,7 @@ main_menu() {
         "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
         "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
         "─"  "$(printf "%-${W}s" "─── Voices ─────────────")"
-        "14" "$(printf "%-${W}s" "List and Switch Voices")"
+        "14" "$(printf "%-${W}s" "Switch Voices")"
         "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
         "15" "$(printf "%-${W}s" "Check log rotation")"
         "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
