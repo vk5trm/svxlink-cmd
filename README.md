@@ -26,6 +26,8 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
   - Alsamixer integration (auto-detects USB audio device)
   - Audio Calibration tool for adjusting audio level on Rx and TX
   - Signal detector Calibration Tool for adjusting CTCSS tone sensitivity
+    
+- **Change Voices**: Change voices in a GIT repository with multiple voices from the menu
 - **Maintenance**: Log rotation check and auto-fix
 - **System Info**: Live system display showing service status, CPU temperature, uptime, and last boot time
 
@@ -69,7 +71,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v2.6.7  ────────────┐
+┌──────────── Svx Admin v2.7.0  ────────────┐
 │                                           │
 │  Choose an action:                        │
 │ ┌───────────────────────────────────────┐ │
@@ -84,12 +86,13 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │  7  Edit config file                  │ │
 │ │  8  Edit environment defaults         │ │
 │ │  9  Edit main event scripts (.tcl)    │ │
-| | 10  Edit modules config               | |
-| | 11  Edit modules event scripts (.tcl) | |
+| | 10  Edit modules event scripts (.tcl) | |
 │ │  ─  ─── Audio ──────────────          │ │
-│ │ 12  Alsamixer                         │ │
-│ │ 13  Audio Calibration tool            │ │
-│ │ 14  Signal Level Detector Calibration │ │
+│ │ 11  Alsamixer                         │ │
+│ │ 12  Audio Calibration tool            │ │
+│ │ 13  Signal Level Detector Calibration │ │
+| |  ─  ─── Voices ─────────────          | │
+| | 14  Switch Voices                     | |
 │ │  ─  ─── Maintenance ────────          │ │
 │ │ 15  Check log rotation                │ │
 │ │  ─  ────── Boot  ───────────          │ │
@@ -119,9 +122,22 @@ SvxLink configuration files are typically located in:
                     - [Module_PropagationMonitor:](https://www.svxlink.org/doc/man/man5/ModulePropagationMonitor.conf.5.html)
                     - [Module_SelCallEnc:](https://www.svxlink.org/doc/man/man5/ModuleSelCallEnc.conf.5.html)
   
-Use the "Edit main config file" & "Edit Modules config" menu option for safe editing of configuration files. Click on the above config file for detailed configuration options.
+Use the "Edit config file" menu option for safe editing of configuration files. Click on the above config file for detailed configuration options.
 
-Use the "Edit main events scripts" & "Edit modules event scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
+Use the "Edit main events scripts" & "Edit modules event scripts" menu option for safe editing. Refer to the [Events-Handling-System ](https://github.com/sm0svx/svxlink/wiki/Events-Handling-System)for detailed configuration options. Edit these files with CARE. Remove any funchions you are not changing but leave the
+```bash
+namespace eval ${::logic_name} {
+```
+and the closing lines from the at the bottom of the file
+```bash
+# end of namespace
+}
+# This file has not been truncated
+# 
+```
+***WARNING*** It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
+
+The "Switch Voices Menu" lets you change voices if you have a voice repository with multiple voices like my [Australian voices](https://github.com/vk5trm/en_AU) repository. They can be cloned to your computer by following the instructions in README on the page
 
 ## Troubleshooting
 
