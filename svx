@@ -590,106 +590,122 @@ action_edit_module_event_files() {
 action_list_voices() {
     # Check if git is available
     if ! command -v git &>/dev/null; then
-        show_result "Error" "git is not installed.\n\nInstall it with:\n  apt install git"
-        return
+        show_result "Error" "git is not installed.\n\nInstall it with:\n  sudo apt install git"
+        return 1
     fi
-  if [[ ! -d "$SOUND_DIR" ]]; then
+
+    # Ensure SOUND_DIR is set
+    if [[ -z "$SOUND_DIR" ]]; then
+        show_result "Error" "SOUND_DIR is not defined."
+        return 1
+    fi
+
+    if [[ ! -d "$SOUND_DIR" ]]; then
         show_result "Error" "Sound directory not found:\n${SOUND_DIR}"
-        return
+        return 1
     fi
 
-    local -a DIR=()
-    while IFS= read -r -d '' file; do
-        DIR+=("$DIR")
-    done < <(
-        find "$SOUND_DIR" \
-            -maxdepth 1 \
-            -type d \
-            -name "*" \
-            -print0 | sort -z
-    )
+    # Collect directories into an array properly
+    local -a DIRS=()
+    while IFS= read -r -d '' dir; do
+        DIRS+=("$dir")
+    done < <(find "$SOUND_DIR" -maxdepth 1 -mindepth 1 -type d -print0 | sort -z)
 
-    if [[ ${#DIR[@]} -eq 0 ]]; then
-        show_result "No Config Files" "No Directorys found in:\n${SOUND_DIR}"
-        return
-    fi
-
-    local -a menu_items=()
-    local idx=1
-    for file in "${DIR[@]}"; do
-        local display_name
-        display_name=$(basename "$DIR")
-        menu_items+=("$idx" "$display_name")
-        ((idx++))
-    done
-
-    local cmd
-    if [[ "$DIALOG" == "dialog" ]]; then
-        cmd="dialog --colors --no-shadow --title ' Select Directory ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
-    else
-        cmd="whiptail --title ' Select Directory ' --menu '\nChoose a .Directory:\n' 16 70 7"
-    fi
-    
-    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
-    eval "$cmd" || return
-
-    local choice
-    choice=$(<"$DIALOG_OUT")
-    
-    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return
-    fi
-
-    local selected_dir="${DIR[$((choice - 1))]}"
-
-    if [[ ! -d "$selected_file" ]]; then
-        show_result "Error" "Directory not found:\n${selected_file}"
-        return
-    fi
-    # Get list of branches (voices)
-    local -a voices=()
-    while IFS= read -r branch; do
-        # Remove refs/heads/ prefix
-        branch="${branch#refs/heads/}"
-        voices+=("$branch")
-    done < <(git --git-dir=$SOUND_DIR/selected_dir for-each-ref refs/heads/ --format='%(refname)')
-
-    if [[ ${#voices[@]} -eq 0 ]]; then
-        show_result "No Voices Found" "No branches (voices) found in the repository."
-        return
+    if [[ ${#DIRS[@]} -eq 0 ]]; then
+        show_result "No Config Files" "No Directories found in:\n${SOUND_DIR}"
+        return 1
     fi
 
     # Build menu items
     local -a menu_items=()
     local idx=1
-    for voice in "${voices[@]}"; do
-        menu_items+=("$idx" "$voice")
+    for dir in "${DIRS[@]}"; do
+        local display_name
+        display_name=$(basename "$dir")
+        menu_items+=("$idx" "$display_name")
         ((idx++))
+    done
+
+    # Determine command based on tool availability
+    local cmd
+    local title_menu="Select Directory"
+    local prompt_msg="Choose a directory:"
+
+    if [[ "$DIALOG" == "dialog" ]]; then
+        cmd="dialog --colors --no-shadow --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
+    else
+        # Fallback to whiptail if dialog is not preferred or available
+        cmd="whiptail --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
+    fi
+    
+    # Execute menu and capture choice
+    # Note: We pass the menu items array expanded
+    eval "$cmd" "${menu_items[@]}" 2>"$DIALOG_OUT"
+    
+    local choice
+    choice=$(<"$DIALOG_OUT")
+    
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return 0 # User cancelled
+    fi
+
+    # Get the selected directory path
+    local selected_dir="${DIRS[$((choice - 1))]}"
+
+    if [[ ! -d "$selected_dir" ]]; then
+        show_result "Error" "Directory not found:\n${selected_dir}"
+        return 1
+    fi
+
+    # Get list of branches (voices) from the selected directory
+    local -a voices=()
+    # Fixed: Correctly expand $selected_dir and use proper git-dir syntax
+    while IFS= read -r branch; do
+        # Remove refs/heads/ prefix
+        branch="${branch#refs/heads/}"
+        voices+=("$branch")
+    done < <(git --git-dir="$selected_dir/.git" for-each-ref refs/heads/ --format='%(refname)' 2>/dev/null)
+
+    if [[ ${#voices[@]} -eq 0 ]]; then
+        show_result "No Voices Found" "No branches (voices) found in:\n${selected_dir}"
+        return 1
+    fi
+
+    # Build menu items for voices
+    local -a voice_menu_items=()
+    local v_idx=1
+    for voice in "${voices[@]}"; do
+        voice_menu_items+=("$v_idx" "$voice")
+        ((v_idx++))
     done
 
     # Display voices menu
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Available Voices " \
-            --menu "\nSelect a voice to display details:\n" 16 70 "${#menu_items[@]}" \
-            "${menu_items[@]}" 2>"$DIALOG_OUT" || return
+            --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
+            "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
     else
         whiptail --title " Available Voices " \
-            --menu "\nSelect a voice to display details:\n" 16 70 "${#menu_items[@]}" \
-            "${menu_items[@]}" 2>"$DIALOG_OUT" || return
+            --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
+            "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
     fi
 
-    local choice
-    choice=$(<"$DIALOG_OUT")
+    local v_choice
+    v_choice=$(<"$DIALOG_OUT")
 
-    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return
+    if [[ -z "$v_choice" ]] || [[ ! "$v_choice" =~ ^[0-9]+$ ]]; then
+        return 0
     fi
 
-    local selected_voice="${voices[$((choice - 1))]}"
+    local selected_voice="${voices[$((v_choice - 1))]}"
 
     # Show voice info
+    # Fixed: Use the correct path for git rev-parse
+    local commit_hash
+    commit_hash=$(git --git-dir="$selected_dir/.git" rev-parse refs/heads/"$selected_voice" 2>/dev/null | cut -c1-8)
+    
     local info="Selected voice: $selected_voice\n\n"
-    info+="Commit: $(git --git-dir="$temp_repo" rev-parse refs/heads/"$selected_voice" 2>/dev/null | cut -c1-8)\n"
+    info+="Commit: $commit_hash\n"
     info+="\nDo you want to switch to this voice using 'git checkout'?"
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -701,49 +717,47 @@ action_list_voices() {
     fi
 
     if [[ $? -eq 0 ]]; then
-        action_switch_voice "$selected_voice"
+        action_switch_voice "$selected_voice" "$selected_dir"
     fi
 }
 
 action_switch_voice() {
     local voice_name="${1:-}"
+    local target_repo="${2:-}" # Pass the repo path explicitly
 
     if [[ -z "$voice_name" ]]; then
         show_result "Error" "No voice specified."
-        return
+        return 1
     fi
 
     # Check if git is available
     if ! command -v git &>/dev/null; then
         show_result "Error" "git is not installed."
-        return
+        return 1
     fi
 
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir &>/dev/null; then
-        show_result "Error" "Not in a git repository.\n\nPlease run this from your voices repository directory."
-        return
+    # Check if target_repo is valid
+    if [[ -z "$target_repo" ]] || [[ ! -d "$target_repo" ]]; then
+        show_result "Error" "Invalid repository path: $target_repo"
+        return 1
     fi
-
-    clear
-    echo "=== Switching to voice: $voice_name ==="
-    echo ""
 
     # Confirm the action
-    read -rp "Are you sure you want to checkout '$voice_name'? (yes/no): " confirm
+    read -rp "Are you sure you want to checkout '$voice_name' in '$target_repo'? (yes/no): " confirm
     if [[ "$confirm" != "yes" ]]; then
         echo "Cancelled."
         read -rp "Press Enter to continue..."
-        return
+        return 1
     fi
 
     # Perform git checkout
-    if git checkout "$voice_name" 2>&1; then
+    # We use --git-dir and --work-tree to be safe, or just cd if you prefer
+    if git --git-dir="$target_repo/.git" --work-tree="$target_repo" checkout "$voice_name" 2>&1; then
         echo ""
         echo "✓ Successfully switched to voice: $voice_name"
         echo ""
         echo "The following files were updated:"
-        git log -1 --oneline "$voice_name"
+        git --git-dir="$target_repo/.git" --work-tree="$target_repo" log -1 --oneline "$voice_name"
         read -rp "Press Enter to continue..."
     else
         echo ""
