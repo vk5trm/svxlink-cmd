@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.6.7"
+readonly VERSION="2.7.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Root check ---
@@ -127,6 +127,7 @@ readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly CONFIG_DIR="/etc/svxlink/"
+readonly SOUND_DIR="/usr/share/svxlink/sounds"
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -324,57 +325,52 @@ action_edit_events() {
         return
     fi
 
-# Build final file list
-# Local overrides take precedence over main files
+    # Build final file list - Local overrides take precedence over main files
+    local -a tcl_files=()
+    local -A seen_files=()
 
-local -a tcl_files=()
-local -A seen_files=()
+    # Add local files first
+    if [[ -d "$LOCAL_EVENTS_DIR" ]]; then
+        while IFS= read -r -d '' file; do
+            local base
+            base=$(basename "$file")
+            tcl_files+=("$file")
+            seen_files["$base"]=1
+        done < <(
+            find "$LOCAL_EVENTS_DIR" \
+                -maxdepth 1 \
+                -type f \
+                -name "*.tcl" \
+                -print0 | sort -z
+        )
+    fi
 
-# Add local files first
-if [[ -d "$LOCAL_EVENTS_DIR" ]]; then
+    # Add main files only if not overridden locally
     while IFS= read -r -d '' file; do
         local base
         base=$(basename "$file")
-
-        tcl_files+=("$file")
-        seen_files["$base"]=1
+        if [[ -z "${seen_files[$base]:-}" ]]; then
+            tcl_files+=("$file")
+        fi
     done < <(
-        find "$LOCAL_EVENTS_DIR" \
+        find "$EVENTS_DIR" \
             -maxdepth 1 \
             -type f \
             -name "*.tcl" \
             -print0 | sort -z
     )
-fi
-
-# Add main files only if not overridden locally
-while IFS= read -r -d '' file; do
-    local base
-    base=$(basename "$file")
-
-    if [[ -z "${seen_files[$base]:-}" ]]; then
-        tcl_files+=("$file")
-    fi
-done < <(
-    find "$EVENTS_DIR" \
-        -maxdepth 1 \
-        -type f \
-        -name "*.tcl" \
-        -print0 | sort -z
-)
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${EVENTS_DIR}"
         return
     fi
 
-    # Build menu items as simple tag-description pairs
+    # Build menu items
     local -a menu_items=()
     local idx=1
     for file in "${tcl_files[@]}"; do
         local display_name
         display_name=$(basename "$file")
-        # Indicate if it's a modified override
         if [[ "$file" == "$LOCAL_EVENTS_DIR"/* ]]; then
             display_name="${display_name} (modified)"
         fi
@@ -382,7 +378,6 @@ done < <(
         ((idx++))
     done
 
-    # Display menu using eval for proper expansion
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' Select Event Script ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
@@ -407,7 +402,6 @@ done < <(
         return
     fi
 
-    # Check if local dir exists, create if not
     if [[ ! -d "$LOCAL_EVENTS_DIR" ]]; then
         mkdir -p "$LOCAL_EVENTS_DIR" || {
             show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
@@ -415,95 +409,66 @@ done < <(
         }
     fi
 
-# Edit selected file using a temporary copy,
-# then optionally save with a different filename
+    local original_filename
+    original_filename=$(basename "$selected_file")
 
-local original_filename
-original_filename=$(basename "$selected_file")
+    local temp_file
+    temp_file=$(mktemp "/run/${original_filename}.XXXXXX") || {
+        show_result "Error" "Failed to create temporary file"
+        return
+    }
 
-# Create temp file
-local temp_file
-temp_file=$(mktemp "/run/${original_filename}.XXXXXX") || {
-    show_result "Error" "Failed to create temporary file"
-    return
-}
+    trap 'rm -f "$temp_file"' RETURN
 
-# Cleanup temp file automatically
-trap 'rm -f "$temp_file"' RETURN
+    if ! cp "$selected_file" "$temp_file"; then
+        show_result "Error" "Failed to prepare temporary file"
+        return
+    fi
 
-# Copy source into temp file
-if ! cp "$selected_file" "$temp_file"; then
-    show_result "Error" "Failed to prepare temporary file"
-    return
-fi
+    "$EDITOR" "$temp_file"
 
-# Edit temp file
-"$EDITOR" "$temp_file"
+    if cmp -s "$selected_file" "$temp_file"; then
+        show_result "No Changes" "File was not modified."
+        return
+    fi
 
-# Detect no changes
-if cmp -s "$selected_file" "$temp_file"; then
-    show_result "No Changes" "File was not modified."
-    return
-fi
+    local save_name
+    if [[ "$DIALOG" == "dialog" ]]; then
+        save_name=$(dialog --stdout --title " Save Event Script " --inputbox "\nSave as filename:" 10 60 "$original_filename")
+    else
+        save_name=$(whiptail --inputbox "\nSave as filename:" 10 60 "$original_filename" 3>&1 1>&2 2>&3)
+    fi
 
-# Ask for save filename
-local save_name
+    [[ $? -eq 0 ]] || return
 
-if [[ "$DIALOG" == "dialog" ]]; then
-    save_name=$(dialog \
-        --stdout \
-        --title " Save Event Script " \
-        --inputbox "\nSave as filename:" \
-        10 60 \
-        "$original_filename")
-else
-    save_name=$(whiptail \
-        --inputbox "\nSave as filename:" \
-        10 60 \
-        "$original_filename" \
-        3>&1 1>&2 2>&3)
-fi
+    if [[ -z "$save_name" ]]; then
+        show_result "Error" "Filename cannot be empty."
+        return
+    fi
 
-# Cancelled
-[[ $? -eq 0 ]] || return
+    [[ "$save_name" != *.tcl ]] && save_name="${save_name}.tcl"
+    mkdir -p "$LOCAL_EVENTS_DIR" || {
+        show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
+        return
+    }
 
-# Empty filename
-if [[ -z "$save_name" ]]; then
-    show_result "Error" "Filename cannot be empty."
-    return
-fi
-
-# Ensure .tcl extension
-[[ "$save_name" != *.tcl ]] && save_name="${save_name}.tcl"
-
-# Ensure local dir exists
-mkdir -p "$LOCAL_EVENTS_DIR" || {
-    show_result "Error" \
-        "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
-    return
-}
-
-local local_file="${LOCAL_EVENTS_DIR}/${save_name}"
-
-# Save edited version
-if ! cp "$temp_file" "$local_file"; then
-    show_result "Error" \
-        "Failed to save edited file to:\n${local_file}"
-    return
-fi
+    local local_file="${LOCAL_EVENTS_DIR}/${save_name}"
+    if ! cp "$temp_file" "$local_file"; then
+        show_result "Error" "Failed to save edited file to:\n${local_file}"
+        return
+    fi
 }
 
 # =============================================================================
-# NEW FUNCTION: Edit Modules Config added by VK5TRM
+# Edit Config added by VK5TRM
 # =============================================================================
 
 action_edit_config() {
     if [[ ! -d "$CONFIG_DIR" ]]; then
-        show_result "Error" "Modules directory not found:\n${CONFIG_DIR}"
+        show_result "Error" "Config directory not found:\n${CONFIG_DIR}"
         return
     fi
 
-    # Find all .conf files in the modules directory
     local -a conf_files=()
     while IFS= read -r -d '' file; do
         conf_files+=("$file")
@@ -520,7 +485,6 @@ action_edit_config() {
         return
     fi
 
-    # Build menu items - show only filename
     local -a menu_items=()
     local idx=1
     for file in "${conf_files[@]}"; do
@@ -530,7 +494,6 @@ action_edit_config() {
         ((idx++))
     done
 
-    # Display menu using eval for proper expansion
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
@@ -555,12 +518,11 @@ action_edit_config() {
         return
     fi
 
-    # Edit the selected file
     $EDITOR "$selected_file"
 }
 
 # =============================================================================
-# NEW FUNCTION: Edit Module event Files added by VK5TRM
+# Edit Module event Files added by VK5TRM
 # =============================================================================
 
 action_edit_module_event_files() {
@@ -569,7 +531,6 @@ action_edit_module_event_files() {
         return
     fi
 
-    # Find all .tcl files in module events directory
     local -a tcl_files=()
     while IFS= read -r -d '' file; do
         tcl_files+=("$file")
@@ -586,7 +547,6 @@ action_edit_module_event_files() {
         return
     fi
 
-    # Build menu items - show only filename
     local -a menu_items=()
     local idx=1
     for file in "${tcl_files[@]}"; do
@@ -596,7 +556,6 @@ action_edit_module_event_files() {
         ((idx++))
     done
 
-    # Display menu using eval for proper expansion
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
@@ -621,8 +580,177 @@ action_edit_module_event_files() {
         return
     fi
 
-    # Edit the selected file directly
     $EDITOR "$selected_file"
+}
+
+# =============================================================================
+# NEW FUNCTION: List and Switch Voices from Git Repository added by VK5TRM
+# =============================================================================
+
+action_list_voices() {
+    # Check if git is available
+    if ! command -v git &>/dev/null; then
+        show_result "Error" "git is not installed.\n\nInstall it with:\n  sudo apt install git"
+        return 1
+    fi
+
+    # Ensure SOUND_DIR is set
+    if [[ -z "$SOUND_DIR" ]]; then
+        show_result "Error" "SOUND_DIR is not defined."
+        return 1
+    fi
+
+    if [[ ! -d "$SOUND_DIR" ]]; then
+        show_result "Error" "Sound directory not found:\n${SOUND_DIR}"
+        return 1
+    fi
+
+    # Collect directories into an array properly
+    local -a DIRS=()
+    while IFS= read -r -d '' dir; do
+        DIRS+=("$dir")
+    done < <(find "$SOUND_DIR" -maxdepth 1 -mindepth 1 -type d -print0 | sort -z)
+
+    if [[ ${#DIRS[@]} -eq 0 ]]; then
+        show_result "No Config Files" "No Directories found in:\n${SOUND_DIR}"
+        return 1
+    fi
+
+    # Build menu items
+    local -a menu_items=()
+    local idx=1
+    for dir in "${DIRS[@]}"; do
+        local display_name
+        display_name=$(basename "$dir")
+        menu_items+=("$idx" "$display_name")
+        ((idx++))
+    done
+
+    # Determine command based on tool availability
+    local cmd
+    local title_menu="Select Directory"
+    local prompt_msg="Choose a directory:"
+
+    if [[ "$DIALOG" == "dialog" ]]; then
+        cmd="dialog --colors --no-shadow --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
+    else
+        # Fallback to whiptail if dialog is not preferred or available
+        cmd="whiptail --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
+    fi
+    
+    # Execute menu and capture choice
+    # Note: We pass the menu items array expanded
+    eval "$cmd" "${menu_items[@]}" 2>"$DIALOG_OUT"
+    
+    local choice
+    choice=$(<"$DIALOG_OUT")
+    
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return 0 # User cancelled
+    fi
+
+    # Get the selected directory path
+    local selected_dir="${DIRS[$((choice - 1))]}"
+
+    if [[ ! -d "$selected_dir" ]]; then
+        show_result "Error" "Directory not found:\n${selected_dir}"
+        return 1
+    fi
+
+     # Get list of branches (voices) from the selected directory
+    local -a voices=()
+    while IFS= read -r branch; do
+        # Remove refs/heads/ prefix
+        branch="${branch#refs/heads/}"        
+       if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+            continue
+        fi
+        voices+=("$branch")
+    done < <(git --git-dir="$selected_dir/.git" for-each-ref refs/heads/ --format='%(refname)' 2>/dev/null)
+
+    if [[ ${#voices[@]} -eq 0 ]]; then
+        show_result "No Voices Found" "No custom branches found."
+        return 1
+    fi
+
+
+    # Build menu items for voices
+    local -a voice_menu_items=()
+    local v_idx=1
+    for voice in "${voices[@]}"; do
+        voice_menu_items+=("$v_idx" "$voice")
+        ((v_idx++))
+    done
+
+    # Display voices menu
+    if [[ "$DIALOG" == "dialog" ]]; then
+        dialog --colors --no-shadow --title " Available Voices " \
+            --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
+            "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
+    else
+        whiptail --title " Available Voices " \
+            --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
+            "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
+    fi
+
+    local v_choice
+    v_choice=$(<"$DIALOG_OUT")
+
+    if [[ -z "$v_choice" ]] || [[ ! "$v_choice" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+
+    local selected_voice="${voices[$((v_choice - 1))]}"
+
+    # Show voice info
+    local info="Selected voice: $selected_voice\n\n"
+    info+="\nDo you want to switch to this voice?"
+
+    if [[ "$DIALOG" == "dialog" ]]; then
+        dialog --colors --no-shadow --title " Switch Voice? " \
+            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
+    else
+        whiptail --title " Switch Voice? " \
+            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
+    fi
+
+    if [[ $? -eq 0 ]]; then
+        action_switch_voice "$selected_voice" "$selected_dir"
+    fi
+}
+
+action_switch_voice() {
+    local voice_name="${1:-}"
+    local target_repo="${2:-}" # Pass the repo path explicitly
+
+    if [[ -z "$voice_name" ]]; then
+        show_result "Error" "No voice specified."
+        return 1
+    fi
+
+    # Check if git is available
+    if ! command -v git &>/dev/null; then
+        show_result "Error" "git is not installed."
+        return 1
+    fi
+
+    # Check if target_repo is valid
+    if [[ -z "$target_repo" ]] || [[ ! -d "$target_repo" ]]; then
+        show_result "Error" "Invalid repository path: $target_repo"
+        return 1
+    fi
+    # Perform git checkout
+    # We use --git-dir and --work-tree to be safe, or just cd if you prefer
+    if git --git-dir="$target_repo/.git" --work-tree="$target_repo" checkout "$voice_name" 2>&1; then
+        echo ""
+        echo "✓ Successfully switched to voice: $voice_name"
+        echo ""
+        read -rp "Press Enter to continue..."
+    else
+        echo ""
+        echo "✗ Failed to switch to voice: $voice_name"
+        read -rp "Press Enter to continue..."
+    fi
 }
 
 action_alsamixer() {
@@ -653,7 +781,6 @@ readonly LOGROTATE_CONTENT='
 }'
 
 action_check_logrotate() {
-    # Check if any file-based logs exist
     local has_logs=false
     for svc in "${SERVICES[@]}"; do
         [[ -f "${LOG_FILES[$svc]}" ]] && has_logs=true && break
@@ -664,7 +791,6 @@ action_check_logrotate() {
         return
     fi
 
-    # File logs exist — check logrotate
     if ! command -v logrotate &>/dev/null; then
         show_result "Warning" "SvxLink is writing to log files but\nlogrotate is not installed.\n\nInstall it with:\n  apt install logrotate\n\nThen run this check again."
         return
@@ -824,32 +950,31 @@ action_devcal_sections() {
         flag="-t"
     fi
     if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
-    # Stop svxlink service
-    clear
-    echo "=== Stopping svxlink service ==="
-    systemctl stop svxlink.service
-    sleep 2
-fi
+        clear
+        echo "=== Stopping svxlink service ==="
+        systemctl stop svxlink.service
+        sleep 2
+    fi
     # Run devcal
     echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
     if [[ "$flag" == -r ]]; then
-    echo "== Recommended setup for measurement:"
-    echo " Please set a RF signal generator on the Frequency you are using at 1000 Hz tone 2400 Hz deviation "
-    echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
-    echo "    2. Adjust level using + or - in devcal (fine adjustment)"
-    echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
-    echo "    4. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
+        echo "== Recommended setup for measurement:"
+        echo " Please set a RF signal generator on the Frequency you are using at 1000 Hz tone 2400 Hz deviation "
+        echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
+        echo "    2. Adjust level using + or - in devcal (fine adjustment)"
+        echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
+        echo "    4. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
     else
-    echo "== Recommended setup for measurement:"
-    echo "   - Hit T on keyboard to transmit"
-    echo "   - Use a deviation meter if available OR"
-    echo "   - Use the Bessel 0 Null method:"
-    echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
-    echo "       2. Adjust the modulation until the carrier is minimized."
-    echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
-    echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
-    echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation." 
-    echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
+        echo "== Recommended setup for measurement:"
+        echo "   - Hit T on keyboard to transmit"
+        echo "   - Use a deviation meter if available OR"
+        echo "   - Use the Bessel 0 Null method:"
+        echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
+        echo "       2. Adjust the modulation until the carrier is minimized."
+        echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
+        echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
+        echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation." 
+        echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
     fi
     echo ""
     (
@@ -934,12 +1059,11 @@ action_siglevdetcal() {
     local rx_section="${selected_logic##*|}"
     
     if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
-    # Stop svxlink service
-    clear
-    echo "=== Stopping svxlink service ==="
-    systemctl stop svxlink.service
-    sleep 2
-fi
+        clear
+        echo "=== Stopping svxlink service ==="
+        systemctl stop svxlink.service
+        sleep 2
+    fi
 
     # Run siglevdetcal
     echo "=== Running siglevdetcal $conf $rx_section (Ctrl+C to stop) ==="
@@ -953,7 +1077,6 @@ fi
 }
 
 action_reboot() {
- # Restart Computer
     clear
     echo "=== Restarting Computer ==="
     reboot -n
@@ -987,12 +1110,14 @@ main_menu() {
         "11" "$(printf "%-${W}s" "Alsamixer")"
         "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
         "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
+        "─"  "$(printf "%-${W}s" "─── Voices ─────────────")"
+        "14" "$(printf "%-${W}s" "Switch Voices")"
         "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
-        "14" "$(printf "%-${W}s" "Check log rotation")"
+        "15" "$(printf "%-${W}s" "Check log rotation")"
         "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
-        "15" "$(printf "%-${W}s" "Enable service at boot")"
-        "16" "$(printf "%-${W}s" "Disable service at boot")"
-        "17" "$(printf "%-${W}s" "Reboot Computer")"
+        "16" "$(printf "%-${W}s" "Enable service at boot")"
+        "17" "$(printf "%-${W}s" "Disable service at boot")"
+        "18" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -1000,14 +1125,14 @@ main_menu() {
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-label "Quit" \
-            --menu "\nChoose an action:\n" 35 50 26 \
+            --menu "\nChoose an action:\n" 35 50 28 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     else
         whiptail \
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-button "Quit" \
-            --menu "\nChoose an action:\n" 35 50 26 \
+            --menu "\nChoose an action:\n" 35 50 28 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     fi
 }
@@ -1032,15 +1157,17 @@ while true; do
         9)  action_edit_events ;;
         10) action_edit_module_event_files ;;
         11) action_alsamixer ;;
-        12) action_devcal_sections ;;
+        12) action_devcal_sections ;;        
         13) action_siglevdetcal ;;
-        14) action_check_logrotate ;;
-        15) action_enable ;;
-        16) action_disable ;;
-        17) action_reboot ;;
+        14) action_list_voices ;;
+        15) action_check_logrotate ;;
+        16) action_enable ;;
+        17) action_disable ;;
+        18) action_reboot ;;
+        
          *)  ;; # separator selected, ignore
     esac
 done
 
- clear
+clear
 echo "Goodbye!"
