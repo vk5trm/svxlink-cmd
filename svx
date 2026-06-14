@@ -127,6 +127,7 @@ readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly CONFIG_DIR="/etc/svxlink/"
+readonly SOUNDS_DIR="/usr/share/svxlink/sounds"
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -464,7 +465,7 @@ action_edit_events() {
 
 action_edit_config() {
     if [[ ! -d "$CONFIG_DIR" ]]; then
-        show_result "Error" "Modules directory not found:\n${CONFIG_DIR}"
+        show_result "Error" "Config directory not found:\n${CONFIG_DIR}"
         return
     fi
 
@@ -592,14 +593,66 @@ action_list_voices() {
         show_result "Error" "git is not installed.\n\nInstall it with:\n  apt install git"
         return
     fi
+  if [[ ! -d "$SOUND_DIR" ]]; then
+        show_result "Error" "Sound directory not found:\n${SOUND_DIR}"
+        return
+    fi
 
+    local -a DIR=()
+    while IFS= read -r -d '' file; do
+        DIR+=("$DIR")
+    done < <(
+        find "$SOUND_DIR" \
+            -maxdepth 1 \
+            -type d \
+            -name "*" \
+            -print0 | sort -z
+    )
+
+    if [[ ${#DIR[@]} -eq 0 ]]; then
+        show_result "No Config Files" "No Directorys found in:\n${SOUND_DIR}"
+        return
+    fi
+
+    local -a menu_items=()
+    local idx=1
+    for file in "${DIR[@]}"; do
+        local display_name
+        display_name=$(basename "$DIR")
+        menu_items+=("$idx" "$display_name")
+        ((idx++))
+    done
+
+    local cmd
+    if [[ "$DIALOG" == "dialog" ]]; then
+        cmd="dialog --colors --no-shadow --title ' Select Directory ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
+    else
+        cmd="whiptail --title ' Select Directory ' --menu '\nChoose a .Directory:\n' 16 70 7"
+    fi
+    
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
+    eval "$cmd" || return
+
+    local choice
+    choice=$(<"$DIALOG_OUT")
+    
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return
+    fi
+
+    local selected_dir="${DIR[$((choice - 1))]}"
+
+    if [[ ! -d "$selected_file" ]]; then
+        show_result "Error" "Directory not found:\n${selected_file}"
+        return
+    fi
     # Get list of branches (voices)
     local -a voices=()
     while IFS= read -r branch; do
         # Remove refs/heads/ prefix
         branch="${branch#refs/heads/}"
         voices+=("$branch")
-    done < <(git --git-dir=/usr/share/svxlink/sounds/en_AU for-each-ref refs/heads/ --format='%(refname)')
+    done < <(git --git-dir=$SOUND_DIR/selected_dir for-each-ref refs/heads/ --format='%(refname)')
 
     if [[ ${#voices[@]} -eq 0 ]]; then
         show_result "No Voices Found" "No branches (voices) found in the repository."
