@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.6.7"
+readonly VERSION="2.7.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Root check ---
@@ -700,12 +700,7 @@ action_list_voices() {
     local selected_voice="${voices[$((v_choice - 1))]}"
 
     # Show voice info
-    # Fixed: Use the correct path for git rev-parse
-    local commit_hash
-    commit_hash=$(git --git-dir="$selected_dir/.git" rev-parse refs/heads/"$selected_voice" 2>/dev/null | cut -c1-8)
-    
     local info="Selected voice: $selected_voice\n\n"
-    info+="Commit: $commit_hash\n"
     info+="\nDo you want to switch to this voice?"
 
     if [[ "$DIALOG" == "dialog" ]]; then
