@@ -127,7 +127,7 @@ readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly CONFIG_DIR="/etc/svxlink/"
-readonly SOUNDS_DIR="/usr/share/svxlink/sounds"
+readonly SOUND_DIR="/usr/share/svxlink/sounds"
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
