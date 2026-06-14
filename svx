@@ -599,7 +599,7 @@ action_list_voices() {
         # Remove refs/heads/ prefix
         branch="${branch#refs/heads/}"
         voices+=("$branch")
-    done < <(git --git-dir=/usr/share/svxlink/sounds for-each-ref refs/heads/ --format='%(refname)')
+    done < <(git --git-dir=/usr/share/svxlink/sounds/en_AU for-each-ref refs/heads/ --format='%(refname)')
 
     if [[ ${#voices[@]} -eq 0 ]]; then
         show_result "No Voices Found" "No branches (voices) found in the repository."
