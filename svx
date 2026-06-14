@@ -706,7 +706,7 @@ action_list_voices() {
     
     local info="Selected voice: $selected_voice\n\n"
     info+="Commit: $commit_hash\n"
-    info+="\nDo you want to switch to this voice using 'git checkout'?"
+    info+="\nDo you want to switch to this voice?"
 
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Switch Voice? " \
@@ -747,8 +747,6 @@ action_switch_voice() {
         echo ""
         echo "✓ Successfully switched to voice: $voice_name"
         echo ""
-        echo "The following files were updated:"
-        git --git-dir="$target_repo/.git" --work-tree="$target_repo" log -1 --oneline "$voice_name"
         read -rp "Press Enter to continue..."
     else
         echo ""
