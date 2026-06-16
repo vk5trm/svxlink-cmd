@@ -680,6 +680,7 @@ action_list_voices() {
             echo "Success: Symlink created at '$lnk' pointing to '$selected_dir'"
             read -rp "Press Enter to continue..."  
             return 0
+           fi
     fi
 
 
