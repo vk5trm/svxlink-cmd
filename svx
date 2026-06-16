@@ -758,6 +758,7 @@ action_switch_voice() {
             rm -rf "$lnk"
             ln -sf "$selected_dir" "$lnk" 
             echo ""
+            echo "Success: Symlink created at '$lnk' pointing to '$selected_dir'"
             echo "✓ Successfully switched to voice: $voice_name"
             echo ""
             read -rp "Press Enter to continue..."
