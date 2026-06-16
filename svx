@@ -659,10 +659,12 @@ action_list_voices() {
 
      # Get list of branches (voices) from the selected directory
     local -a voices=()
+    local default_branch=""
     while IFS= read -r branch; do
         # Remove refs/heads/ prefix
         branch="${branch#refs/heads/}"        
        if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+            default_branch="$branch"
             continue
         fi
         voices+=("$branch")
