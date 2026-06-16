@@ -667,10 +667,21 @@ action_list_voices() {
         fi
         voices+=("$branch")
     done < <(git --git-dir="$selected_dir/.git" for-each-ref refs/heads/ --format='%(refname)' 2>/dev/null)
-
-    if [[ ${#voices[@]} -eq 0 ]]; then
-        show_result "No Voices Found" "No custom branches found."
-        return 1
+     lnk="$SOUND_DIR"'/en_US'
+     if [[ ${#voices[@]} -eq 0 ]]; then
+        if [[ -n "$default_branch" ]]; then
+            show_result "Single Branch Detected" "This repository only contains the '$default_branch' branch.\n\nSwitching to it automatically to set the en_US link."
+            action_switch_voice "$default_branch" "$selected_dir"
+            return 0
+      else
+            show_result "No Branches Found" "No branches detected in this repository."
+            if [ -e "$lnk" ] || [ -L "$lnk" ]; then
+            rm -rf "$lnk"
+            fi
+            ln -sf "$selected_dir" "$lnk" 
+            echo "Success: Symlink created at '$lnk' pointing to '$selected_dir'"
+            read -rp "Press Enter to continue..."  
+            return 0
     fi
 
 
@@ -742,10 +753,14 @@ action_switch_voice() {
     # Perform git checkout
     # We use --git-dir and --work-tree to be safe, or just cd if you prefer
     if git --git-dir="$target_repo/.git" --work-tree="$target_repo" checkout "$voice_name" 2>&1; then
-        echo ""
-        echo "✓ Successfully switched to voice: $voice_name"
-        echo ""
-        read -rp "Press Enter to continue..."
+       if [ -e "$lnk" ] || [ -L "$lnk" ]; then
+            rm -rf "$lnk"
+            fi
+            ln -sf "$selected_dir" "$lnk" 
+            echo ""
+            echo "✓ Successfully switched to voice: $voice_name"
+            echo ""
+            read -rp "Press Enter to continue..."
     else
         echo ""
         echo "✗ Failed to switch to voice: $voice_name"
