@@ -137,7 +137,7 @@ and the closing lines from the at the bottom of the file
 ```
 ***WARNING*** It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
 
-The "Switch Voices Menu" lets you change voices if you have a voice repository with multiple voices like my [Australian voices](https://github.com/vk5trm/en_AU) repository. They can be cloned to your computer by following the instructions in README on the page
+The "Switch Voices Menu" lets you change voices on your system. It can handle either a normal directory with voice files, A single GIT repository with one set of voice files or a voice repository with multiple voices like my [Australian voices](https://github.com/vk5trm/en_AU) repository. They can be cloned to your computer by following the instructions in README on the page
 
 ## Troubleshooting
 
