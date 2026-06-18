@@ -27,7 +27,7 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
   - Audio Calibration tool for adjusting audio level on Rx and TX
   - Signal detector Calibration Tool for adjusting CTCSS tone sensitivity
     
-- **Change Voices**: Change voices in a GIT repository with multiple voices from the menu
+- **Change Voices**: Change voices in a Directory or GIT repository with single or multiple voices from the menu
 - **Maintenance**: Log rotation check and auto-fix
 - **System Info**: Live system display showing service status, CPU temperature, uptime, and last boot time
 
