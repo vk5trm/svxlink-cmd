@@ -672,7 +672,6 @@ action_list_voices() {
      lnk="$SOUND_DIR"'/en_US'
      if [[ ${#voices[@]} -eq 0 ]]; then
         if [[ -n "$default_branch" ]]; then
-            show_result "Single Branch Detected" "Switching to it automatically."
             action_switch_voice "$default_branch" "$selected_dir"
             return 0
       else
@@ -711,18 +710,6 @@ action_list_voices() {
     fi
 
     local selected_voice="${voices[$((v_choice - 1))]}"
-
-    # Show voice info
-    local info="Selected voice: $selected_voice\n\n"
-    info+="\nDo you want to switch to this voice?"
-
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Switch Voice? " \
-            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
-    else
-        whiptail --title " Switch Voice? " \
-            --yesno "\n${info}" 12 60 2>"$DIALOG_OUT"
-    fi
 
     if [[ $? -eq 0 ]]; then
         action_switch_voice "$selected_voice" "$selected_dir"
