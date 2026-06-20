@@ -17,7 +17,7 @@ if [[ ${#missing_pkgs[@]} -gt 0 ]]; then
     read -rp "Install them now? [Y/n] " answer
     case "${answer:-y}" in
         [Yy]*)
-            apt-get install -y "${missing_pkgs[@]}"
+            sudo apt-get install -y "${missing_pkgs[@]}"
             ;;
         *)
             echo "Cannot continue without: ${missing_pkgs[*]}" >&2
