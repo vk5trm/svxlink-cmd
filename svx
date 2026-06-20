@@ -2,19 +2,13 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.7.0"
+readonly VERSION="2.8.0"
 readonly SCRIPT_NAME="Svx Admin"
-
-# --- Root check ---
-if [[ $EUID -ne 0 ]]; then
-    echo "Error: This script must be run as root (sudo ./svx.sh)" >&2
-    exit 1
-fi
 
 # --- Dependency check ---
 missing_pkgs=()
 
-if ! command -v dialog &>/dev/null && ! command -v whiptail &>/dev/null; then
+if ! command -v dialog &>/dev/null; then
     missing_pkgs+=("dialog")
 fi
 
@@ -23,7 +17,7 @@ if [[ ${#missing_pkgs[@]} -gt 0 ]]; then
     read -rp "Install them now? [Y/n] " answer
     case "${answer:-y}" in
         [Yy]*)
-            apt-get update -qq && apt-get install -y "${missing_pkgs[@]}"
+            apt-get install -y "${missing_pkgs[@]}"
             ;;
         *)
             echo "Cannot continue without: ${missing_pkgs[*]}" >&2
@@ -36,8 +30,6 @@ fi
 DIALOG=""
 if command -v dialog &>/dev/null; then
     DIALOG="dialog"
-elif command -v whiptail &>/dev/null; then
-    DIALOG="whiptail"
 else
     echo "Error: dialog installation failed." >&2
     exit 1
@@ -52,43 +44,43 @@ trap 'rm -f "$DIALOG_OUT" "$DIALOGRC_FILE"' EXIT
 
 if [[ "$DIALOG" == "dialog" ]]; then
     cat > "$DIALOGRC_FILE" <<'THEME'
-use_shadow = OFF
+use_shadow = ON
 use_colors = ON
-screen_color = (WHITE,BLACK,ON)
+screen_color = (CYAN,BLUE,ON)
 shadow_color = (BLACK,BLACK,ON)
-dialog_color = (WHITE,BLACK,OFF)
-title_color = (GREEN,BLACK,ON)
-border_color = (WHITE,BLACK,ON)
+dialog_color = (BLACK,WHITE,OFF)
+title_color = (BLUE,WHITE,ON)
+border_color = (WHITE,WHITE,ON)
 button_active_color = (WHITE,BLUE,ON)
-button_inactive_color = (WHITE,BLACK,OFF)
+button_inactive_color = (BLACK,WHITE,OFF)
 button_key_active_color = (WHITE,BLUE,ON)
-button_key_inactive_color = (WHITE,BLACK,ON)
-button_label_active_color = (WHITE,BLUE,ON)
-button_label_inactive_color = (WHITE,BLACK,ON)
-menubox_color = (WHITE,BLACK,OFF)
-menubox_border_color = (WHITE,BLACK,OFF)
-menubox_border2_color = (WHITE,BLACK,OFF)
-item_color = (WHITE,BLACK,OFF)
-item_selected_color = (BLACK,WHITE,OFF)
-tag_color = (GREEN,BLACK,ON)
-tag_selected_color = (BLACK,WHITE,ON)
-tag_key_color = (GREEN,BLACK,ON)
-tag_key_selected_color = (BLACK,WHITE,ON)
-check_color = (WHITE,BLACK,OFF)
-check_selected_color = (BLACK,GREEN,ON)
-uarrow_color = (GREEN,BLACK,ON)
-darrow_color = (GREEN,BLACK,ON)
-inputbox_color = (WHITE,BLACK,OFF)
-inputbox_border_color = (WHITE,BLACK,ON)
-form_active_text_color = (BLACK,GREEN,ON)
-form_text_color = (WHITE,BLACK,OFF)
-form_item_readonly_color = (WHITE,BLACK,ON)
-gauge_color = (GREEN,BLACK,ON)
-border2_color = (WHITE,BLACK,OFF)
-searchbox_color = (WHITE,BLACK,OFF)
-searchbox_title_color = (GREEN,BLACK,ON)
-searchbox_border_color = (WHITE,BLACK,ON)
-position_indicator_color = (GREEN,BLACK,ON)
+button_key_inactive_color = (RED,WHITE,OFF)
+button_label_active_color = (YELLOW,BLUE,ON)
+button_label_inactive_color = (BLACK,WHITE,ON)
+menubox_color = (BLACK,WHITE,OFF)
+menubox_border_color = (WHITE,WHITE,ON)
+menubox_border2_color = (WHITE,WHITE,ON)
+item_color = (BLACK,WHITE,OFF)
+item_selected_color = (WHITE,BLUE,ON)
+tag_color = (BLUE,WHITE,ON)
+tag_selected_color = (YELLOW,BLUE,ON)
+tag_key_color = (BLACK,WHITE,ON)
+tag_key_selected_color = (RED,BLUE,ON)
+check_color = (BLACK,WHITE,OFF)
+check_selected_color = (WHITE,BLUE,ON)
+uarrow_color = (GREEN,WHITE,ON)
+darrow_color = (GREEN,WHITE,ON)
+inputbox_color = (BLACK,WHITE,OFF)
+inputbox_border_color = (BLACK,WHITE,OFF)
+form_active_text_color = (WHITE,BLUE,ON)
+form_text_color = (WHITE,CYAN,ON)
+form_item_readonly_color = (WHITE,CYAN,ON)
+gauge_color = (BLUE,WHITE,ON)
+border2_color = (BLACK,WHITE,OFF)
+searchbox_color = (BLACK,WHITE,OFF)
+searchbox_title_color = (BLUE,WHITE,ON)
+searchbox_border_color = (WHITE,WHITE,ON)
+position_indicator_color = (BLUE,WHITE,ON)
 THEME
     export DIALOGRC="$DIALOGRC_FILE"
 fi
@@ -208,10 +200,6 @@ pick_service() {
         dialog --colors --no-shadow --title " Select Service " \
             --menu "\n$prompt\n" 14 0 3 \
             "${items[@]}" 2>"$DIALOG_OUT" || return 1
-    else
-        whiptail --title " Select Service " \
-            --menu "\n$prompt\n" 14 0 3 \
-            "${items[@]}" 2>"$DIALOG_OUT" || return 1
     fi
 
     local choice
@@ -229,8 +217,6 @@ show_result() {
     local msg="$2"
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title "$title" --msgbox "$msg" 15 60
-    else
-        whiptail --title "$title" --msgbox "$msg" 15 60
     fi
 }
 
@@ -243,7 +229,7 @@ do_service_action() {
     pick_service "Select service to ${action}:" || return
     local svc="$PICKED_SERVICE"
     local output
-    output=$(systemctl "$action" "${svc}.service" 2>&1) && \
+    output=$(sudo systemctl "$action" "${svc}.service" 2>&1) && \
         show_result "Success" "${SERVICE_LABELS[$svc]}: ${action} completed.\n\n${output}" || \
         show_result "Error" "${SERVICE_LABELS[$svc]}: ${action} failed.\n\n${output}"
 }
@@ -251,6 +237,7 @@ do_service_action() {
 action_start()   { do_service_action "start"; }
 action_stop()    { do_service_action "stop"; }
 action_restart() { do_service_action "restart"; }
+action_reload()  { do_service_action "reload"; }
 action_enable()  { do_service_action "enable"; }
 action_disable() { do_service_action "disable"; }
 
@@ -266,38 +253,51 @@ action_status() {
     show_result "${SERVICE_LABELS[$svc]} Status" "$output"
 }
 
+# =============================================================================
+# NEW FUNCTION: View Log File (Tailbox - Scrollable & Live)
+# =============================================================================
+
 action_logs() {
-    pick_service "Follow logs for:" || return
+    pick_service "Select service to view logs for:" || return
     local svc="$PICKED_SERVICE"
     local logfile="${LOG_FILES[$svc]}"
-    local log_items=("journald" "$(printf "%-12s%s" "journalctl" "-u ${svc}.service")")
-    if [[ -f "$logfile" ]]; then
-        log_items+=("file" "$(printf "%-12s%s" "tail -f" "${logfile}")")
-    fi
 
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title "Log Source" \
-            --menu "\nChoose log source for ${SERVICE_LABELS[$svc]}:\n" 12 55 2 \
-            "${log_items[@]}" 2>"$DIALOG_OUT" || return
-    else
-        whiptail --title "Log Source" \
-            --menu "\nChoose log source for ${SERVICE_LABELS[$svc]}:\n" 12 55 2 \
-            "${log_items[@]}" 2>"$DIALOG_OUT" || return
-    fi
-
-    local source
-    source=$(<"$DIALOG_OUT")
-    clear
-    echo "=== Following logs for ${SERVICE_LABELS[$svc]} (Ctrl+C to return) ==="
-    echo ""
-    (
+    # Check if the log file exists
+    if [[ ! -f "$logfile" ]]; then
+        show_result "No Log File" "Log file not found:\n${logfile}\n\nThe service might be logging to journald only."
+         clear
+        echo "=== Following logs for ${SERVICE_LABELS[$svc]} (Ctrl+C to return) ==="
+        echo ""
+        (
         trap 'exit 0' INT
-        if [[ "$source" == "journald" ]]; then
-            journalctl -u "${svc}.service" -f
+        journalctl -u "${svc}.service" -f
+        )
+        return
+    fi
+
+    # Check file size to prevent freezing on huge files
+    local max_size_mb=50
+    local file_size_kb
+    file_size_kb=$(du -k "$logfile" | cut -f1)
+    local file_size_mb=$((file_size_kb / 1024))
+
+    if [[ $file_size_mb -gt $max_size_mb ]]; then
+        if [[ "$DIALOG" == "dialog" ]]; then
+            dialog --colors --no-shadow --title "File Too Large" \
+                --msgbox "The log file is too large (${file_size_mb}MB).\n\nUsing tailbox on large files may be slow.\n\nRecommend using SSH or 'Follow live logs'." 12 60
         else
-            tail -f "$logfile"
+            whiptail --title "File Too Large" \
+                --msgbox "The log file is too large (${file_size_mb}MB).\n\nUsing tailbox on large files may be slow.\n\nRecommend using SSH or 'Follow live logs'." 12 60
         fi
-    )
+        return
+    fi
+
+    # Display the log file in a tailbox (scrollable + live follow)
+    if [[ "$DIALOG" == "dialog" ]]; then
+        # Note: --tailbox requires the file to exist and be readable
+        dialog --colors --no-shadow --title " Log: ${logfile##*/} " \
+            --tailbox "$logfile" 40 100
+    fi
 }
 
 # =============================================================================
@@ -312,7 +312,7 @@ action_edit_env() {
         show_result "Error" "Environment file not found:\n${envf}"
         return
     fi
-    $EDITOR "$envf"
+    sudo $EDITOR "$envf"
 }
 
 # =============================================================================
@@ -381,16 +381,14 @@ action_edit_events() {
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' Select Event Script ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
-    else
-        cmd="whiptail --title ' Select Event Script ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
     fi
-    
+
     cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
     eval "$cmd" || return
 
     local choice
     choice=$(<"$DIALOG_OUT")
-    
+
     if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
         return
     fi
@@ -403,7 +401,7 @@ action_edit_events() {
     fi
 
     if [[ ! -d "$LOCAL_EVENTS_DIR" ]]; then
-        mkdir -p "$LOCAL_EVENTS_DIR" || {
+        sudo mkdir -p "$LOCAL_EVENTS_DIR" || {
             show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
             return
         }
@@ -413,19 +411,19 @@ action_edit_events() {
     original_filename=$(basename "$selected_file")
 
     local temp_file
-    temp_file=$(mktemp "/run/${original_filename}.XXXXXX") || {
+    temp_file=$(sudo mktemp "/run/${original_filename}.XXXXXX") || {
         show_result "Error" "Failed to create temporary file"
         return
     }
 
-    trap 'rm -f "$temp_file"' RETURN
+    trap 'sudo rm -f "$temp_file"' RETURN
 
-    if ! cp "$selected_file" "$temp_file"; then
+    if ! sudo cp "$selected_file" "$temp_file"; then
         show_result "Error" "Failed to prepare temporary file"
         return
     fi
 
-    "$EDITOR" "$temp_file"
+    sudo "$EDITOR" "$temp_file"
 
     if cmp -s "$selected_file" "$temp_file"; then
         show_result "No Changes" "File was not modified."
@@ -435,8 +433,6 @@ action_edit_events() {
     local save_name
     if [[ "$DIALOG" == "dialog" ]]; then
         save_name=$(dialog --stdout --title " Save Event Script " --inputbox "\nSave as filename:" 10 60 "$original_filename")
-    else
-        save_name=$(whiptail --inputbox "\nSave as filename:" 10 60 "$original_filename" 3>&1 1>&2 2>&3)
     fi
 
     [[ $? -eq 0 ]] || return
@@ -447,13 +443,13 @@ action_edit_events() {
     fi
 
     [[ "$save_name" != *.tcl ]] && save_name="${save_name}.tcl"
-    mkdir -p "$LOCAL_EVENTS_DIR" || {
+    sudo mkdir -p "$LOCAL_EVENTS_DIR" || {
         show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
         return
     }
 
     local local_file="${LOCAL_EVENTS_DIR}/${save_name}"
-    if ! cp "$temp_file" "$local_file"; then
+    if ! sudo cp "$temp_file" "$local_file"; then
         show_result "Error" "Failed to save edited file to:\n${local_file}"
         return
     fi
@@ -497,16 +493,14 @@ action_edit_config() {
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
-    else
-        cmd="whiptail --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
     fi
-    
+
     cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
     eval "$cmd" || return
 
     local choice
     choice=$(<"$DIALOG_OUT")
-    
+
     if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
         return
     fi
@@ -518,7 +512,7 @@ action_edit_config() {
         return
     fi
 
-    $EDITOR "$selected_file"
+    sudo $EDITOR "$selected_file"
 }
 
 # =============================================================================
@@ -559,16 +553,14 @@ action_edit_module_event_files() {
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
-    else
-        cmd="whiptail --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
     fi
-    
+
     cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
     eval "$cmd" || return
 
     local choice
     choice=$(<"$DIALOG_OUT")
-    
+
     if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
         return
     fi
@@ -580,7 +572,7 @@ action_edit_module_event_files() {
         return
     fi
 
-    $EDITOR "$selected_file"
+    sudo $EDITOR "$selected_file"
 }
 
 # =============================================================================
@@ -633,18 +625,15 @@ action_list_voices() {
 
     if [[ "$DIALOG" == "dialog" ]]; then
         cmd="dialog --colors --no-shadow --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
-    else
-        # Fallback to whiptail if dialog is not preferred or available
-        cmd="whiptail --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
     fi
-    
+
     # Execute menu and capture choice
     # Note: We pass the menu items array expanded
     eval "$cmd" "${menu_items[@]}" 2>"$DIALOG_OUT"
-    
+
     local choice
     choice=$(<"$DIALOG_OUT")
-    
+
     if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
         return 0 # User cancelled
     fi
@@ -662,7 +651,7 @@ action_list_voices() {
     local default_branch=""
     while IFS= read -r branch; do
         # Remove refs/heads/ prefix
-        branch="${branch#refs/heads/}"        
+        branch="${branch#refs/heads/}"
        if [[ "$branch" == "main" || "$branch" == "master" ]]; then
             default_branch="$branch"
             continue
@@ -675,8 +664,8 @@ action_list_voices() {
             action_switch_voice "$default_branch" "$selected_dir"
             return 0
       else
-            rm -rf "$lnk"
-            ln -sf "$selected_dir" "$lnk" 
+            sudo rm -rf "$lnk"
+            sudo ln -sf "$selected_dir" "$lnk"
             show_result "No Branches Found" "Directory may still contain audio files."
             return 0
            fi
@@ -694,10 +683,6 @@ action_list_voices() {
     # Display voices menu
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Available Voices " \
-            --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
-            "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
-    else
-        whiptail --title " Available Voices " \
             --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
             "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
     fi
@@ -740,28 +725,22 @@ action_switch_voice() {
     # Perform git checkout and capture output
     local checkout_output
     local lnk="$SOUND_DIR/en_US"
-    
+
     # We use --git-dir and --work-tree to be safe
     if checkout_output=$(git --git-dir="$target_repo/.git" --work-tree="$target_repo" checkout "$voice_name" 2>&1); then
         # Success: Remove old link and create new one
-        rm -rf "$lnk"
-        ln -sf "$target_repo" "$lnk" 
-        
+        sudo rm -rf "$lnk"
+        sudo ln -sf "$target_repo" "$lnk"
+
         # Show success message in dialog
         if [[ "$DIALOG" == "dialog" ]]; then
             dialog --colors --no-shadow --title " Switch Voice Success " \
-                --msgbox "Successfully switched to voice: $voice_name\n\nGit Output:\n$checkout_output" 15 60
-        else
-            whiptail --title " Switch Voice Success " \
                 --msgbox "Successfully switched to voice: $voice_name\n\nGit Output:\n$checkout_output" 15 60
         fi
     else
         # Failure: Show error in dialog
         if [[ "$DIALOG" == "dialog" ]]; then
             dialog --colors --no-shadow --title " Switch Voice Failed " \
-                --msgbox "Failed to switch to voice: $voice_name\n\nError Git Output:\n$checkout_output" 15 60
-        else
-            whiptail --title " Switch Voice Failed " \
                 --msgbox "Failed to switch to voice: $voice_name\n\nError Git Output:\n$checkout_output" 15 60
         fi
     fi
@@ -777,6 +756,13 @@ action_alsamixer() {
     else
         alsamixer || true
     fi
+    if ! command -v alsactl &>/dev/null; then
+    show_result "Alsa Mixer" "No Alsa Control Found"
+    return 1
+    else
+    sudo alsactl store
+    show_result "Alsa Mixer" "Your Alsamixer settings have been saved"
+fi
 }
 
 readonly LOGROTATE_CONF="/etc/logrotate.d/svxlink-server"
@@ -788,10 +774,12 @@ readonly LOGROTATE_CONTENT='
     daily
     rotate 7
     compress
-    delaycompress
     missingok
     notifempty
-    copytruncate
+    create 0644 svxlink adm
+    postrotate
+        killall -HUP svxlink
+    endscript
 }'
 
 action_check_logrotate() {
@@ -818,13 +806,13 @@ action_check_logrotate() {
         if [[ "$DIALOG" == "dialog" ]]; then
             dialog --colors --no-shadow --title " Log Rotation Missing " \
                 --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nDaily rotation, 7 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
-        else
-            whiptail --title " Log Rotation Missing " \
-                --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nDaily rotation, 7 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
         fi
         if [[ $? -eq 0 ]]; then
-            echo "$LOGROTATE_CONTENT" > "$LOGROTATE_CONF"
-            chmod 644 "$LOGROTATE_CONF"
+            sudo sh -c "cat > '$LOGROTATE_CONF' << 'EOF'
+            $LOGROTATE_CONTENT"
+            sudo rm /etc/logrotate.d/svxreflector"
+            sudo rm /etc/logrotate.d/remotetrx"
+            sudo chmod 644 "$LOGROTATE_CONF"
             show_result "Success" "Created ${LOGROTATE_CONF}\n\nLog rotation is now active."
         fi
     fi
@@ -845,9 +833,6 @@ action_health_check() {
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " System Health " \
             --msgbox "$report" 28 70
-    else
-        whiptail --title " System Health " \
-            --msgbox "$report" 28 70
     fi
 }
 
@@ -857,18 +842,18 @@ action_health_check() {
 
 action_devcal_sections() {
     local conf="${CONFIG_FILES[svxlink]}"
-    
+
     if [[ ! -f "$conf" ]]; then
         show_result "Error" "Config file not found:\n${conf}"
         return
     fi
-    
+
     # Extract all RepeaterLogic and SimplexLogic section names with their RX and TX values
     local logics=()
     local current_section=""
     local current_rx=""
     local current_tx=""
-    
+
     while IFS= read -r line; do
         # Check if this is a RepeaterLogic or SimplexLogic section header
         if [[ "$line" =~ ^\[(RepeaterLogic|SimplexLogic)[^]]*\] ]]; then
@@ -892,17 +877,17 @@ action_devcal_sections() {
             current_tx="${current_tx// /}"  # Remove spaces
         fi
     done < "$conf"
-    
+
     # Don't forget the last section
     if [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]]; then
         logics+=("$current_section|$current_rx|$current_tx")
     fi
-    
+
     if [[ ${#logics[@]} -eq 0 ]]; then
         show_result "No Logics Found" "No RepeaterLogic or SimplexLogic sections found in:\n${conf}"
         return
     fi
-    
+
     # Create menu items from logics
     local items=()
     local i=1
@@ -914,45 +899,37 @@ action_devcal_sections() {
         items+=("$i" "$section (RX: $rx / TX: $tx)")
         ((i++))
     done
-    
+
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Select Logic " \
             --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" \
             "${items[@]}" 2>"$DIALOG_OUT" || return
-    else
-        whiptail --title " Select Logic " \
-            --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" \
-            "${items[@]}" 2>"$DIALOG_OUT" || return
     fi
-    
+
     local choice
     choice=$(<"$DIALOG_OUT")
     local selected_logic="${logics[$((choice - 1))]}"
-    
+
     # Parse the selected logic using pipe delimiter
     local rx_section="${selected_logic#*|}"
     rx_section="${rx_section%%|*}"
     local tx_section="${selected_logic##*|}"
-    
+
     # Show RX/TX selection menu
     local rxtx_items=(
         "1" "RX: $rx_section"
         "2" "TX: $tx_section"
     )
-    
+
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Select RX or TX " \
             --menu "\nChoose which to calibrate:\n" 12 40 2 \
             "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
-    else
-        whiptail --title " Select RX or TX " \
-            --menu "\nChoose which to calibrate:\n" 12 40 2 \
-            "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
     fi
-    
+
     local rxtx_choice
     rxtx_choice=$(<"$DIALOG_OUT")
-    
+
     # Determine which section and flag to use
     local section
     local flag
@@ -966,7 +943,7 @@ action_devcal_sections() {
     if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
         clear
         echo "=== Stopping svxlink service ==="
-        systemctl stop svxlink.service
+        sudo systemctl stop svxlink.service
         sleep 2
     fi
     # Run devcal
@@ -986,8 +963,8 @@ action_devcal_sections() {
         echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
         echo "       2. Adjust the modulation until the carrier is minimized."
         echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
-        echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section" 
-        echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation." 
+        echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section"
+        echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
         echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
     fi
     echo ""
@@ -995,7 +972,7 @@ action_devcal_sections() {
         trap 'exit 0' INT
         devcal ${flag} "$conf" "$section"
     )
-    
+
     show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
@@ -1005,17 +982,17 @@ action_devcal_sections() {
 
 action_siglevdetcal() {
     local conf="${CONFIG_FILES[svxlink]}"
-    
+
     if [[ ! -f "$conf" ]]; then
         show_result "Error" "Config file not found:\n${conf}"
         return
     fi
-    
+
     # Extract all RepeaterLogic and SimplexLogic section names with their RX values
     local logics=()
     local current_section=""
     local current_rx=""
-    
+
     while IFS= read -r line; do
         # Check if this is a RepeaterLogic or SimplexLogic section header
         if [[ "$line" =~ ^\[(RepeaterLogic|SimplexLogic)[^]]*\] ]]; then
@@ -1034,17 +1011,17 @@ action_siglevdetcal() {
             current_rx="${current_rx// /}"  # Remove spaces
         fi
     done < "$conf"
-    
+
     # Don't forget the last section
     if [[ -n "$current_section" && -n "$current_rx" ]]; then
         logics+=("$current_section|$current_rx")
     fi
-    
+
     if [[ ${#logics[@]} -eq 0 ]]; then
         show_result "No RX Found" "No RX sections found in logic configurations in:\n${conf}"
         return
     fi
-    
+
     # Create menu items from logics
     local items=()
     local i=1
@@ -1054,28 +1031,24 @@ action_siglevdetcal() {
         items+=("$i" "$section - RX: $rx")
         ((i++))
     done
-    
+
     if [[ "$DIALOG" == "dialog" ]]; then
         dialog --colors --no-shadow --title " Select RX " \
             --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" \
             "${items[@]}" 2>"$DIALOG_OUT" || return
-    else
-        whiptail --title " Select RX " \
-            --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" \
-            "${items[@]}" 2>"$DIALOG_OUT" || return
     fi
-    
+
     local choice
     choice=$(<"$DIALOG_OUT")
     local selected_logic="${logics[$((choice - 1))]}"
-    
+
     # Parse the selected logic to get RX section
     local rx_section="${selected_logic##*|}"
-    
+
     if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
         clear
         echo "=== Stopping svxlink service ==="
-        systemctl stop svxlink.service
+        sudo systemctl stop svxlink.service
         sleep 2
     fi
 
@@ -1086,14 +1059,14 @@ action_siglevdetcal() {
         trap 'exit 0' INT
         siglevdetcal "$conf" "$rx_section"
     )
-    
+
     show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
 action_reboot() {
     clear
     echo "=== Restarting Computer ==="
-    reboot -n
+    sudo reboot -n
     sleep 2
 }
 
@@ -1111,24 +1084,24 @@ main_menu() {
         "1"  "$(printf "%-${W}s" "Start service")"
         "2"  "$(printf "%-${W}s" "Stop service")"
         "3"  "$(printf "%-${W}s" "Restart service")"
-        "─"  "$(printf "%-${W}s" "─── Monitoring ─────────")"
+        "-"  "$(printf "%-${W}s" "---------- Monitoring --------------")"
         "4"  "$(printf "%-${W}s" "Show detailed status")"
         "5"  "$(printf "%-${W}s" "Follow live logs")"
         "6"  "$(printf "%-${W}s" "System health check")"
-        "─"  "$(printf "%-${W}s" "─── Configuration ──────")"
+        "-"  "$(printf "%-${W}s" "----------- Configuration ------------")"
         "7"  "$(printf "%-${W}s" "Edit config files")"
         "8"  "$(printf "%-${W}s" "Edit environment defaults")"
         "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
         "10" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
-        "─"  "$(printf "%-${W}s" "─── Audio ──────────────")"
-        "11" "$(printf "%-${W}s" "Alsamixer")"
+        "-"  "$(printf "%-${W}s" "----------- Audio --------------------")"
+        "11" "$(printf "%-${W}s" "Alsa Mixer")"
         "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
         "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
-        "─"  "$(printf "%-${W}s" "─── Voices ─────────────")"
+        "-"  "$(printf "%-${W}s" "------------ Voices ------------------")"
         "14" "$(printf "%-${W}s" "Switch Voices")"
-        "─"  "$(printf "%-${W}s" "─── Maintenance ────────")"
+        "-"  "$(printf "%-${W}s" "------------- Maintenance ------------")"
         "15" "$(printf "%-${W}s" "Check log rotation")"
-        "─"  "$(printf "%-${W}s" "───── Boot ─────────────")"
+        "-"  "$(printf "%-${W}s" "------------- Boot -------------------")"
         "16" "$(printf "%-${W}s" "Enable service at boot")"
         "17" "$(printf "%-${W}s" "Disable service at boot")"
         "18" "$(printf "%-${W}s" "Reboot Computer")"
@@ -1139,13 +1112,6 @@ main_menu() {
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-label "Quit" \
-            --menu "\nChoose an action:\n" 35 50 28 \
-            "${menu_items[@]}" 2>"$DIALOG_OUT"
-    else
-        whiptail \
-            --title " $SCRIPT_NAME v$VERSION " \
-            --backtitle "$status_title | $sysinfo" \
-            --cancel-button "Quit" \
             --menu "\nChoose an action:\n" 35 50 28 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     fi
@@ -1171,17 +1137,17 @@ while true; do
         9)  action_edit_events ;;
         10) action_edit_module_event_files ;;
         11) action_alsamixer ;;
-        12) action_devcal_sections ;;        
+        12) action_devcal_sections ;;
         13) action_siglevdetcal ;;
         14) action_list_voices ;;
         15) action_check_logrotate ;;
         16) action_enable ;;
         17) action_disable ;;
         18) action_reboot ;;
-        
+
          *)  ;; # separator selected, ignore
     esac
 done
 
-clear
+ clear
 echo "Goodbye!"

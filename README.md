@@ -2,7 +2,7 @@
 
 Interactive terminal tool for administering [SvxLink](https://github.com/sm0svx/svxlink) services on a Raspberry Pi. Simplifies management of repeater systems with a user-friendly menu interface.
 
-This is a maintained fork of the original [svxlink-cmd](https://github.com/audric/svxlink-cmd) by [Audric IW1GEU](https://github.com/audric).
+This is a modified fork of the original [svxlink-cmd](https://github.com/audric/svxlink-cmd) by [Audric IW1GEU](https://github.com/audric).
 
 ## Table of Contents
 
@@ -23,7 +23,7 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
 - **Configuration**: Edit configuration, events scripts and environment files
 - **Boot Management**: Enable / Disable services at boot and reboot system
 - **Audio Tools**: 
-  - Alsamixer integration (auto-detects USB audio device)
+  - Alsamixer integration - Auto saves your settings on exit. (auto-detects USB audio device)
   - Audio Calibration tool for adjusting audio level on Rx and TX
   - Signal detector Calibration Tool for adjusting CTCSS tone sensitivity
     
@@ -42,10 +42,8 @@ This is a maintained fork of the original [svxlink-cmd](https://github.com/audri
 - **Hardware**: Raspberry Pi (or Debian-based system)
 - **Software**:
   - SvxLink installed and configured
-  - `dialog` or `whiptail` (auto-detected; the script will offer to install if missing)
-  - `sudo` privileges (script must be run as root)
+  - `dialog` (auto-detected; the script will offer to install if missing) - Whiptail is no longer surpported
   - `systemd` (for service management)
-  - `journalctl` (for log viewing)
 
 ## Installation
 
@@ -60,9 +58,10 @@ sudo rm /usr/local/bin/svx
 ```
 
 ## Usage
+Please note that sudo is no longer required
 
 ```bash
-sudo svx
+svx
 ```
 
 This will launch the interactive admin menu. Navigate using arrow keys and select options with Enter.
@@ -71,7 +70,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 ○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v2.7.0  ────────────┐
+┌──────────── Svx Admin v2.8.0  ────────────┐
 │                                           │
 │  Choose an action:                        │
 │ ┌───────────────────────────────────────┐ │
@@ -147,12 +146,6 @@ The script requires `dialog` or `whiptail` for the menu interface. The script wi
 sudo apt-get install dialog
 ```
 
-### Permission denied when running `svx`
-The script must be run with `sudo`:
-```bash
-sudo svx
-```
-
 ### Services not starting
 Check the service status and logs:
 ```bash
@@ -187,7 +180,7 @@ For bug reports or feature requests, please open an [issue](https://github.com/v
 ## Authors
 
 - [Audric IW1GEU](https://github.com/audric) — Original creator
-- [Rob VK5TRM](https://github.com/vk5trm) — Current maintainer
+- [Rob VK5TRM](https://github.com/vk5trm) — This Modified Version
 
 ## License
 
