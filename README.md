@@ -141,7 +141,7 @@ The "Switch Voices Menu" lets you change voices on your system. It can handle ei
 ## Troubleshooting
 
 ### "dialog: command not found"
-The script requires `dialog` or `whiptail` for the menu interface. The script will offer to install it, or manually install with:
+The script requires `dialog` for the menu interface. The script will offer to install it, or manually install with:
 ```bash
 sudo apt-get install dialog
 ```
