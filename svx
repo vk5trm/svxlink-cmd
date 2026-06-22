@@ -97,22 +97,10 @@ declare -A SERVICE_LABELS=(
     [svxreflector]="SvxReflector"
 )
 
-declare -A CONFIG_FILES=(
-    [svxlink]="/etc/svxlink/svxlink.conf"
-    [remotetrx]="/etc/svxlink/remotetrx.conf"
-    [svxreflector]="/etc/svxlink/svxreflector.conf"
-)
-
 declare -A ENV_FILES=(
     [svxlink]="/etc/default/svxlink"
     [remotetrx]="/etc/default/remotetrx"
     [svxreflector]="/etc/default/svxreflector"
-)
-
-declare -A LOG_FILES=(
-    [svxlink]="/var/log/svxlink"
-    [remotetrx]="/var/log/remotetrx"
-    [svxreflector]="/var/log/svxreflector"
 )
 
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
@@ -120,6 +108,29 @@ readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly CONFIG_DIR="/etc/svxlink/"
 readonly SOUND_DIR="/usr/share/svxlink/sounds"
+
+resolve_logfile() {
+    local svc="$1" lf="" env_lf=""
+    # Read LOGFILE= from the service's /etc/default file (Debian package style)
+    # up front: the stock systemd unit references it as ${LOGFILE} rather than
+    # spelling out a literal path.
+    if [[ -f "${ENV_FILES[$svc]}" ]]; then
+        env_lf=$(grep -E '^[[:space:]]*LOGFILE=' "${ENV_FILES[$svc]}" \
+            | tail -n1 | sed 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//')
+    fi
+    # 1. --logfile=PATH (or --logfile PATH) in the systemd unit's ExecStart
+    lf=$(systemctl cat "${svc}.service" 2>/dev/null \
+        | sed -n 's/.*--logfile[ =]\([^ ]*\).*/\1/p' | head -n1)
+    # The stock unit passes --logfile=${LOGFILE} (an unexpanded shell variable,
+    # not a real path); substitute the env file's value rather than testing for
+    # a file literally named "${LOGFILE}".
+    [[ "$lf" == *'$'* ]] && lf="$env_lf"
+    # 2. Fall back to the env file's LOGFILE
+    [[ -z "$lf" ]] && lf="$env_lf"
+    # 3. Conventional default
+    [[ -z "$lf" ]] && lf="${LOG_FILES[$svc]}"
+    printf '%s' "$lf"
+}
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -260,7 +271,7 @@ action_status() {
 action_logs() {
     pick_service "Select service to view logs for:" || return
     local svc="$PICKED_SERVICE"
-    local logfile="${LOG_FILES[$svc]}"
+    local logfile; logfile=$(resolve_logfile "$svc")
 
     # Check if the log file exists
     if [[ ! -f "$logfile" ]]; then
