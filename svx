@@ -109,17 +109,24 @@ declare -A ENV_FILES=(
     [svxreflector]="/etc/default/svxreflector"
 )
 
-declare -A LOG_FILES=(
-    [svxlink]="/var/log/svxlink"
-    [remotetrx]="/var/log/remotetrx"
-    [svxreflector]="/var/log/svxreflector"
-)
-
 readonly EVENTS_DIR="/usr/share/svxlink/events.d"
 readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
 readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly CONFIG_DIR="/etc/svxlink/"
 readonly SOUND_DIR="/usr/share/svxlink/sounds"
+
+resolve_logfile() {
+    local svc="$1" lf="" env_lf=""
+    if [[ -f "${ENV_FILES[$svc]}" ]]; then
+        env_lf=$(grep -E '^[[:space:]]*LOGFILE=' "${ENV_FILES[$svc]}" \
+            | tail -n1 | sed 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//' || true)
+    fi
+    lf=$(systemctl cat "${svc}.service" 2>/dev/null \
+        | sed -n 's/.*--logfile[ =]\([^ ]*\).*/\1/p' | head -n1 || true)
+    [[ "$lf" == *'$'* ]] && lf="$env_lf"
+    [[ -z "$lf" ]] && lf="$env_lf"
+    printf '%s' "$lf"
+}
 
 # Get service status as a word: active, inactive, failed, unknown
 get_service_status() {
@@ -260,8 +267,8 @@ action_status() {
 action_logs() {
     pick_service "Select service to view logs for:" || return
     local svc="$PICKED_SERVICE"
-    local logfile="${LOG_FILES[$svc]}"
-
+#    local logfile="${LOG_FILES[$svc]}"
+    local logfile; logfile=$(resolve_logfile "$svc")
     # Check if the log file exists
     if [[ ! -f "$logfile" ]]; then
         show_result "No Log File" "Log file not found:\n${logfile}\n\nThe service might be logging to journald only."
