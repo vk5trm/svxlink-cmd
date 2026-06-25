@@ -97,12 +97,6 @@ declare -A SERVICE_LABELS=(
     [svxreflector]="SvxReflector"
 )
 
-declare -A CONFIG_FILES=(
-    [svxlink]="/etc/svxlink/svxlink.conf"
-    [remotetrx]="/etc/svxlink/remotetrx.conf"
-    [svxreflector]="/etc/svxlink/svxreflector.conf"
-)
-
 declare -A ENV_FILES=(
     [svxlink]="/etc/default/svxlink"
     [remotetrx]="/etc/default/remotetrx"
@@ -126,6 +120,33 @@ resolve_logfile() {
     [[ "$lf" == *'$'* ]] && lf="$env_lf"
     [[ -z "$lf" ]] && lf="$env_lf"
     printf '%s' "$lf"
+}
+
+# =============================================================================
+# Config File Resolver (Derived from Environment)
+# =============================================================================
+resolve_config_from_env() {
+    local svc="svxlink"
+    local env_file="/etc/default/svxlink}"
+    local default_config="/etc/svxlink/svxlink.conf"
+    local found_path=""
+
+    # 1. Check if the environment file exists
+    if [[ -f "$env_file" ]]; then
+        # Extract the value, stripping quotes and whitespace
+        found_path=$(grep -E '^[[:space:]]*(SVXLINK_CONF|CFGFILE=' "$env_file" \
+            | tail -n1 | sed 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//' || true)
+        
+        # If a path was found and it looks like a valid path (starts with /)
+        if [[ -n "$found_path" && "$found_path" == /* ]]; then
+            printf '%s' "$found_path"
+            return 0
+        fi
+    fi
+
+    # 2. Fallback: Return the standard default path
+    printf '%s' "$default_config"
+    return 0
 }
 
 # Get service status as a word: active, inactive, failed, unknown
@@ -267,7 +288,6 @@ action_status() {
 action_logs() {
     pick_service "Select service to view logs for:" || return
     local svc="$PICKED_SERVICE"
-#    local logfile="${LOG_FILES[$svc]}"
     local logfile; logfile=$(resolve_logfile "$svc")
     # Check if the log file exists
     if [[ ! -f "$logfile" ]]; then
@@ -848,7 +868,7 @@ action_health_check() {
 # =============================================================================
 
 action_devcal_sections() {
-    local conf="${CONFIG_FILES[svxlink]}"
+    conf=$(resolve_config_from_env)
 
     if [[ ! -f "$conf" ]]; then
         show_result "Error" "Config file not found:\n${conf}"
@@ -954,7 +974,8 @@ action_devcal_sections() {
         sleep 2
     fi
     # Run devcal
-    echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
+        clear
+        echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
     if [[ "$flag" == -r ]]; then
         echo "== Recommended setup for measurement:"
         echo " Please set a RF signal generator on the Frequency you are using at 1000 Hz tone 2400 Hz deviation "
@@ -988,7 +1009,7 @@ action_devcal_sections() {
 # =============================================================================
 
 action_siglevdetcal() {
-    local conf="${CONFIG_FILES[svxlink]}"
+    conf=$(resolve_config_from_env)
 
     if [[ ! -f "$conf" ]]; then
         show_result "Error" "Config file not found:\n${conf}"
@@ -1060,6 +1081,7 @@ action_siglevdetcal() {
     fi
 
     # Run siglevdetcal
+    clear
     echo "=== Running siglevdetcal $conf $rx_section (Ctrl+C to stop) ==="
     echo ""
     (
