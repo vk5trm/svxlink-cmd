@@ -109,6 +109,9 @@ readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
 readonly CONFIG_DIR="/etc/svxlink/"
 readonly SOUND_DIR="/usr/share/svxlink/sounds"
 
+# =============================================================================
+# Log  File Resolver (Derived from Environment)
+# =============================================================================
 resolve_logfile() {
     local svc="$1" lf="" env_lf=""
     if [[ -f "${ENV_FILES[$svc]}" ]]; then
@@ -127,13 +130,12 @@ resolve_logfile() {
 # =============================================================================
 resolve_config_from_env() {
     local svc="svxlink"
-    local env_file="/etc/default/svxlink"
     local found_path=""
 
     # 1. Check if the environment file exists
-    if [[ -f "$env_file" ]]; then
+    if [[ -f "${ENV_FILES[$svc]}" ]]; then
         # Extract the value, stripping quotes and whitespace
-        found_path=$(grep -E '^[[:space:]]*CFGFILE=' "$env_file" \
+        found_path=$(grep -E '^[[:space:]]*CFGFILE=' "${ENV_FILES[$svc]}" \
             | tail -n1 | sed 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//' || true)
         
         # If a path was found and it looks like a valid path (starts with /)
