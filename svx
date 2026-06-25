@@ -127,14 +127,13 @@ resolve_logfile() {
 # =============================================================================
 resolve_config_from_env() {
     local svc="svxlink"
-    local env_file="/etc/default/svxlink}"
-    local default_config="/etc/svxlink/svxlink.conf"
+    local env_file="/etc/default/svxlink"
     local found_path=""
 
     # 1. Check if the environment file exists
     if [[ -f "$env_file" ]]; then
         # Extract the value, stripping quotes and whitespace
-        found_path=$(grep -E '^[[:space:]]*(SVXLINK_CONF|CFGFILE=' "$env_file" \
+        found_path=$(grep -E '^[[:space:]]*CFGFILE=' "$env_file" \
             | tail -n1 | sed 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//' || true)
         
         # If a path was found and it looks like a valid path (starts with /)
@@ -143,10 +142,6 @@ resolve_config_from_env() {
             return 0
         fi
     fi
-
-    # 2. Fallback: Return the standard default path
-    printf '%s' "$default_config"
-    return 0
 }
 
 # Get service status as a word: active, inactive, failed, unknown
