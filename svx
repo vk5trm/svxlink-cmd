@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.8.3"
+readonly VERSION="2.8.5"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Dependency check ---
