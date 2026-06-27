@@ -19,6 +19,7 @@ This is a modified fork of the original [svxlink-cmd](https://github.com/audric/
 ## Features
 
 - **Service Control**: Start / Stop / Restart services
+- **DTMF Control**: Send DTMF commands from the menu
 - **Monitoring**: Detailed service status and live log following (journald or file)
 - **Configuration**: Edit configuration, events scripts and environment files
 - **Boot Management**: Enable / Disable services at boot and reboot system
@@ -77,27 +78,29 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 │ │  1  Start service                     │ │
 │ │  2  Stop service                      │ │
 │ │  3  Restart service                   │ │
+│ │  ─  ─── DTMF Control────────          │ │ 
+│ │  4  Send DTMF Command                 │ │
 │ │  ─  ─── Monitoring ─────────          │ │
-│ │  4  Show detailed status              │ │
-│ │  5  Follow live logs                  │ │
-│ │  6  System health check               │ │
+│ │  5  Show detailed status              │ │
+│ │  6  Follow live logs                  │ │
+│ │  7  System health check               │ │
 │ │  ─  ─── Configuration ──────          │ │
-│ │  7  Edit config file                  │ │
-│ │  8  Edit environment defaults         │ │
-│ │  9  Edit main event scripts (.tcl)    │ │
-| | 10  Edit modules event scripts (.tcl) | |
+│ │  8  Edit config file                  │ │
+│ │  9  Edit environment defaults         │ │
+│ │ 10  Edit main event scripts (.tcl)    │ │
+| | 11  Edit modules event scripts (.tcl) | |
 │ │  ─  ─── Audio ──────────────          │ │
-│ │ 11  Alsamixer                         │ │
-│ │ 12  Audio Calibration tool            │ │
-│ │ 13  Signal Level Detector Calibration │ │
+│ │ 12  Alsamixer                         │ │
+│ │ 13  Audio Calibration tool            │ │
+│ │ 14  Signal Level Detector Calibration │ │
 | |  ─  ─── Voices ─────────────          | │
-| | 14  Switch Voices                     | |
+| | 15  Switch Voices                     | |
 │ │  ─  ─── Maintenance ────────          │ │
-│ │ 15  Check log rotation                │ │
+│ │ 16  Check log rotation                │ │
 │ │  ─  ────── Boot  ───────────          │ │
-│ │ 16  Enable service at boot            │ │
-│ │ 17  Disable service at boot           │ │
-| | 18  Reboot Computer                   | | 
+│ │ 17  Enable service at boot            │ │
+│ │ 18  Disable service at boot           │ │
+| | 19  Reboot Computer                   | | 
 │ └───────────────────────────────────────┘ │
 │          <OK>          <Quit>             │
 └───────────────────────────────────────────┘
@@ -163,7 +166,7 @@ aplay -l
 Then run audio calibration from the menu to detect and configure the device.
 
 ### Log files not rotating
-Use menu option 15 (Check log rotation) to verify log rotation configuration and auto-fix issues.
+Use menu option 16 (Check log rotation) to verify log rotation configuration and auto-fix issues.
 
 ## Contributing
 

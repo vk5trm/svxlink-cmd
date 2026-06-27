@@ -1089,6 +1089,92 @@ action_siglevdetcal() {
     show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
 }
 
+# =============================================================================
+# FUNCTION: Send DTMF (Forced Auto-Discover)
+# =============================================================================
+action_dtmf_control() {
+    local target_pty=""
+    local real_pty=""
+    local target_name="Auto-Found"
+
+    # 1. FORCE AUTO-DETECT: Scan /tmp and /dev/shm for valid dtmf symlinks
+    # This loop finds the first valid symlink and breaks
+    while IFS= read -r -d '' link_path; do
+        # Check if it is actually a symlink
+        if [[ -L "$link_path" ]]; then
+            # Resolve the target
+            local resolved_target
+            resolved_target=$(readlink -f "$link_path" 2>/dev/null)
+            
+            # Check if the target actually exists (is not a broken link)
+            if [[ -n "$resolved_target" && -e "$resolved_target" ]]; then
+                target_pty="$link_path"
+                real_pty="$resolved_target"
+                target_name="Found: $link_path -> $real_pty"
+                break
+            fi
+        fi
+    done < <(find /tmp /dev/shm -maxdepth 1 -name "dtmf*" -type l -print0 2>/dev/null)
+
+    # 2. Final Check: If still nothing, ask user manually
+    if [[ -z "$target_pty" ]]; then
+        if [[ "$DIALOG" == "dialog" ]]; then
+            target_pty=$(dialog --stdout --title " Manual PTY Path " --inputbox "\nNo valid PTY found automatically.\nEnter path manually (e.g. /tmp/dtmf_ctrl70):" 10 60 "/tmp/dtmf_ctrl70" 2>"$DIALOG_OUT")
+        else
+            read -rp "Enter PTY path manually (default /tmp/dtmf_ctrl): " target_pty
+            target_pty="${target_pty:-/tmp/dtmf_ctrl}"
+        fi
+
+        if [[ -z "$target_pty" ]]; then
+            show_result "Error" "No path provided."
+            return
+        fi
+
+        # Verify manually entered path
+        if [[ ! -e "$target_pty" ]]; then
+            show_result "Error" "Path not found: $target_pty"
+            return
+        fi
+
+        # Resolve it
+        real_pty=$(readlink -f "$target_pty" 2>/dev/null)
+        if [[ -z "$real_pty" || ! -e "$real_pty" ]]; then
+            real_pty="$target_pty"
+        fi
+    fi
+
+    # 3. Ask for DTMF command
+    local target_cmd="1#"
+    if [[ "$DIALOG" == "dialog" ]]; then
+        target_cmd=$(dialog --stdout --title " Send DTMF " --inputbox "\nEnter DTMF - No # required (default *)" 10 50 "*" 2>"$DIALOG_OUT")
+    else
+        read -rp "Enter DTMF - No # required (default *): " target_cmd
+        target_cmd="${target_cmd:-*}"
+    fi
+
+    [[ -z "$target_cmd" ]] && return
+
+    # 4. Send the command
+    if [[ "$DIALOG" == "dialog" ]]; then
+        dialog --colors --no-shadow --title " Sending DTMF " \
+            --infobox "\nSending: $target_cmd\n" 6 60
+    fi
+
+    # Use sudo sh -c with printf to handle special characters safely
+    if sudo sh -c "printf '%s' '${target_cmd}#' > '${real_pty}'" 2>/dev/null; then
+        if [[ "$DIALOG" == "dialog" ]]; then
+            dialog --colors --no-shadow --title " Success " \
+                --msgbox "Command sent successfully!\n\nCommand: $target_cmd" 12 60
+        else
+            echo "Command sent successfully!\n\nCommand: $target_cmd"
+        fi
+    else
+        local err_msg
+        err_msg=$(sudo sh -c "printf '%s' '${target_cmd}' > '${real_pty}'" 2>&1)
+        show_result "Error" "Failed to write to device:\n\nError: $err_msg\n\nCheck if SvxLink is running."
+    fi
+}
+
 action_reboot() {
     clear
     echo "=== Restarting Computer ==="
@@ -1110,27 +1196,29 @@ main_menu() {
         "1"  "$(printf "%-${W}s" "Start service")"
         "2"  "$(printf "%-${W}s" "Stop service")"
         "3"  "$(printf "%-${W}s" "Restart service")"
+        "-"  "$(printf "%-${W}s" "---------- DTMF Control-------------")"
+        "4"  "$(printf "%-${W}s" "Send a DTMF Command")"
         "-"  "$(printf "%-${W}s" "---------- Monitoring --------------")"
-        "4"  "$(printf "%-${W}s" "Show detailed status")"
-        "5"  "$(printf "%-${W}s" "Follow live logs")"
-        "6"  "$(printf "%-${W}s" "System health check")"
+        "5"  "$(printf "%-${W}s" "Show detailed status")"
+        "6"  "$(printf "%-${W}s" "Follow live logs")"
+        "7"  "$(printf "%-${W}s" "System health check")"
         "-"  "$(printf "%-${W}s" "----------- Configuration ------------")"
-        "7"  "$(printf "%-${W}s" "Edit config files")"
-        "8"  "$(printf "%-${W}s" "Edit environment defaults")"
-        "9"  "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
-        "10" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
+        "8"  "$(printf "%-${W}s" "Edit config files")"
+        "9"  "$(printf "%-${W}s" "Edit environment defaults")"
+        "10" "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
+        "11" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
         "-"  "$(printf "%-${W}s" "----------- Audio --------------------")"
-        "11" "$(printf "%-${W}s" "Alsa Mixer")"
-        "12" "$(printf "%-${W}s" "Audio Calibration Tool")"
-        "13" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
+        "12" "$(printf "%-${W}s" "Alsa Mixer")"
+        "13" "$(printf "%-${W}s" "Audio Calibration Tool")"
+        "14" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
         "-"  "$(printf "%-${W}s" "------------ Voices ------------------")"
-        "14" "$(printf "%-${W}s" "Switch Voices")"
+        "15" "$(printf "%-${W}s" "Switch Voices")"
         "-"  "$(printf "%-${W}s" "------------- Maintenance ------------")"
-        "15" "$(printf "%-${W}s" "Check log rotation")"
+        "16" "$(printf "%-${W}s" "Check log rotation")"
         "-"  "$(printf "%-${W}s" "------------- Boot -------------------")"
-        "16" "$(printf "%-${W}s" "Enable service at boot")"
-        "17" "$(printf "%-${W}s" "Disable service at boot")"
-        "18" "$(printf "%-${W}s" "Reboot Computer")"
+        "17" "$(printf "%-${W}s" "Enable service at boot")"
+        "18" "$(printf "%-${W}s" "Disable service at boot")"
+        "19" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -1155,22 +1243,22 @@ while true; do
         1)  action_start ;;
         2)  action_stop ;;
         3)  action_restart ;;
-        4)  action_status ;;
-        5)  action_logs ;;
-        6)  action_health_check ;;
-        7)  action_edit_config ;;
-        8)  action_edit_env ;;
-        9)  action_edit_events ;;
-        10) action_edit_module_event_files ;;
-        11) action_alsamixer ;;
-        12) action_devcal_sections ;;
-        13) action_siglevdetcal ;;
-        14) action_list_voices ;;
-        15) action_check_logrotate ;;
-        16) action_enable ;;
-        17) action_disable ;;
-        18) action_reboot ;;
-
+        4)  action_dtmf_control ;;
+        5)  action_status ;;
+        6)  action_logs ;;
+        7)  action_health_check ;;
+        8)  action_edit_config ;;
+        9)  action_edit_env ;;
+        10) action_edit_events ;;
+        11) action_edit_module_event_files ;;
+        12) action_alsamixer ;;
+        13) action_devcal_sections ;;
+        14) action_siglevdetcal ;;
+        15) action_list_voices ;;
+        16) action_check_logrotate ;;
+        17) action_enable ;;
+        18) action_disable ;;
+        19) action_reboot ;;
          *)  ;; # separator selected, ignore
     esac
 done
