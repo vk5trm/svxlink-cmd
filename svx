@@ -1095,10 +1095,11 @@ action_siglevdetcal() {
 action_dtmf_control() {
     local target_pty=""
     local real_pty=""
-    local target_name="Auto-Found"
+    local target_name=""
+    local -a valid_links=()
+    local -a link_targets=()
 
-    # 1. FORCE AUTO-DETECT: Scan /tmp and /dev/shm for valid dtmf symlinks
-    # This loop finds the first valid symlink and breaks
+    # 1. SCAN: Find ALL valid symlinks in /tmp and /dev/shm
     while IFS= read -r -d '' link_path; do
         # Check if it is actually a symlink
         if [[ -L "$link_path" ]]; then
@@ -1108,20 +1109,23 @@ action_dtmf_control() {
             
             # Check if the target actually exists (is not a broken link)
             if [[ -n "$resolved_target" && -e "$resolved_target" ]]; then
-                target_pty="$link_path"
-                real_pty="$resolved_target"
-                target_name="Found: $link_path -> $real_pty"
-                break
+                valid_links+=("$link_path")
+                link_targets+=("$resolved_target")
             fi
         fi
     done < <(find /tmp /dev/shm -maxdepth 1 -name "dtmf*" -type l -print0 2>/dev/null)
 
-    # 2. Final Check: If still nothing, ask user manually
-    if [[ -z "$target_pty" ]]; then
+    # 2. HANDLE MULTIPLE OR SINGLE FINDINGS
+    local num_found=${#valid_links[@]}
+
+    if [[ $num_found -eq 0 ]]; then
+        # --- CASE: No links found ---
         if [[ "$DIALOG" == "dialog" ]]; then
-            target_pty=$(dialog --stdout --title " Manual PTY Path " --inputbox "\nNo valid PTY found automatically.\nEnter path manually (e.g. /tmp/dtmf_ctrl70):" 10 60 "/tmp/dtmf_ctrl70" 2>"$DIALOG_OUT")
+            target_pty=$(dialog --stdout --title " Manual PTY Path " \
+                --inputbox "\nNo valid PTY found automatically.\n\nEnter path manually:" \
+                12 60 "/tmp/dtmf_ctrl" 2>"$DIALOG_OUT")
         else
-            read -rp "Enter PTY path manually (default /tmp/dtmf_ctrl): " target_pty
+            read -rp "Enter PTY path manually: " target_pty
             target_pty="${target_pty:-/tmp/dtmf_ctrl}"
         fi
 
@@ -1136,19 +1140,56 @@ action_dtmf_control() {
             return
         fi
 
-        # Resolve it
         real_pty=$(readlink -f "$target_pty" 2>/dev/null)
         if [[ -z "$real_pty" || ! -e "$real_pty" ]]; then
             real_pty="$target_pty"
         fi
+
+    elif [[ $num_found -eq 1 ]]; then
+        # --- CASE: Exactly one link found (Auto-select) ---
+        target_pty="${valid_links}"
+        real_pty="${link_targets}"
+        target_name="Auto-Found: $target_pty"
+
+    else
+        # --- CASE: Multiple links found (User Selection) ---
+        local -a menu_items=()
+        local idx=1
+
+        for i in "${!valid_links[@]}"; do
+            local link="${valid_links[$i]}"
+            local tgt="${link_targets[$i]}"
+            # Format: "1" "/tmp/dtmf_ctrl"
+            menu_items+=("$idx" "$link")
+            ((idx++))
+        done
+
+        if [[ "$DIALOG" == "dialog" ]]; then
+            dialog --colors --no-shadow --title " Select PTY Device " \
+                --menu "\nMultiple DTMF devices found.\nChoose the correct one:" \
+                16 70 ${#menu_items[@]} 2>"$DIALOG_OUT" "${menu_items[@]}" || return
+        fi
+
+        local choice
+        choice=$(<"$DIALOG_OUT")
+
+        if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+            return # User cancelled
+        fi
+
+        # Convert 1-based choice to 0-based array index
+        local idx=$((choice - 1))
+        target_pty="${valid_links[$idx]}"
+        real_pty="${link_targets[$idx]}"
+        target_name="User Selected: $target_pty"
     fi
 
     # 3. Ask for DTMF command
     local target_cmd="1#"
     if [[ "$DIALOG" == "dialog" ]]; then
-        target_cmd=$(dialog --stdout --title " Send DTMF " --inputbox "\nEnter DTMF - No # required (default *)" 10 50 "*" 2>"$DIALOG_OUT")
+        target_cmd=$(dialog --stdout --title " Send DTMF " --inputbox "\nEnter DTMF - (No # required)" 10 50 "*" 2>"$DIALOG_OUT")
     else
-        read -rp "Enter DTMF - No # required (default *): " target_cmd
+        read -rp "Enter DTMF - (No # required): " target_cmd
         target_cmd="${target_cmd:-*}"
     fi
 
