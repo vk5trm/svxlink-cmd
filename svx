@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.8.5"
+readonly VERSION="2.9.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Dependency check ---
@@ -103,12 +103,6 @@ declare -A ENV_FILES=(
     [svxreflector]="/etc/default/svxreflector"
 )
 
-readonly EVENTS_DIR="/usr/share/svxlink/events.d"
-readonly LOCAL_EVENTS_DIR="${EVENTS_DIR}/local"
-readonly MODULES_EVENTS_DIR="/usr/share/svxlink/modules.d/"
-readonly CONFIG_DIR="/etc/svxlink/"
-readonly SOUND_DIR="/usr/share/svxlink/sounds"
-
 # =============================================================================
 # Log  File Resolver (Derived from Environment)
 # =============================================================================
@@ -130,20 +124,69 @@ resolve_logfile() {
 # =============================================================================
 resolve_config_from_env() {
     local svc="svxlink"
-    local found_path=""
+    local env_file="${ENV_FILES[$svc]}"
+    local found_config_path=""
+    local found_handler_path=""
+    local key value
 
-    # 1. Check if the environment file exists
-    if [[ -f "${ENV_FILES[$svc]}" ]]; then
-        # Extract the value, stripping quotes and whitespace
-        found_path=$(grep -E '^[[:space:]]*CFGFILE=' "${ENV_FILES[$svc]}" \
-            | tail -n1 | sed 's/^[^=]*=//; s/^["'\'']//; s/["'\'']$//' || true)
-        
-        # If a path was found and it looks like a valid path (starts with /)
-        if [[ -n "$found_path" && "$found_path" == /* ]]; then
-            printf '%s' "$found_path"
-            return 0
-        fi
+    # --- STEP 1: Resolve Config Path ---
+    if [[ -z "$env_file" ]]; then
+        return 1
     fi
+
+    if [[ ! -f "$env_file" ]]; then
+        return 1
+    fi
+
+    # Parse ENV file
+    while IFS='=' read -r key value || [[ -n "$key" ]]; do
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        
+        if [[ "$key" == "CFGFILE" ]]; then
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            value="${value#\"}"; value="${value%\"}"
+            value="${value#\'}"; value="${value%\'}"
+            found_config_path="$value"
+            break
+        fi
+    done < "$env_file"
+
+    if [[ -z "$found_config_path" ]] || [[ ! -f "$found_config_path" ]]; then
+        return 1
+    fi
+
+    # --- STEP 2: Resolve EVENT_HANDLER ---
+    while IFS='=' read -r key value || [[ -n "$key" ]]; do
+        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+        
+        if [[ "$key" == "EVENT_HANDLER" ]]; then
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            value="${value#\"}"; value="${value%\"}"
+            value="${value#\'}"; value="${value%\'}"
+            found_handler_path="$value"
+            break
+        fi
+    done < "$found_config_path"
+
+    # --- STEP 3: Set GLOBAL Variables (Force Global) ---
+    # We use 'declare -g' to ensure these are global even if the function is sourced in a weird way
+    declare -g RESOLVED_CONFIG_FILE="$found_config_path"
+    declare -g RESOLVED_CONFIG_DIR="$(dirname "$found_config_path")"
+    
+    if [[ -n "$found_handler_path" ]]; then
+        declare -g RESOLVED_EVENT_HANDLER_DIR="$(dirname "$found_handler_path")"
+    else
+        # Explicitly set to empty string if not found, so we know it was checked
+        declare -g RESOLVED_EVENT_HANDLER_DIR=""
+    fi
+
+    return 0
 }
 
 # Get service status as a word: active, inactive, failed, unknown
@@ -342,47 +385,90 @@ action_edit_env() {
 # =============================================================================
 # NEW FUNCTION: Edit Event Script Actions added by VK5TRM
 # =============================================================================
-
 action_edit_events() {
-    if [[ ! -d "$EVENTS_DIR" ]]; then
-        show_result "Error" "Events directory not found:\n${EVENTS_DIR}"
-        return
+    # 1. Resolve Config
+    if ! resolve_config_from_env; then
+        dialog --title "Config Error" --msgbox "Failed to resolve config." 12 60
+        return 1
     fi
 
-    # Build final file list - Local overrides take precedence over main files
+    # 2. SAFETY CHECK: Verify the variable was actually set
+
+    if [[ -z "$RESOLVED_EVENT_HANDLER_DIR" ]]; then
+        echo "[ERROR] RESOLVED_EVENT_HANDLER_DIR is empty after function call!" >&2
+        
+        # LAST RESORT: Read directly from the config file if the variable failed
+        if [[ -n "$RESOLVED_CONFIG_FILE" ]]; then
+            local direct_handler
+            direct_handler=$(grep -E "^EVENT_HANDLER=" "$RESOLVED_CONFIG_FILE" | head -1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed "s/^['\"]//;s/['\"]$//")
+            
+            if [[ -n "$direct_handler" ]]; then
+                RESOLVED_EVENT_HANDLER_DIR="$(dirname "$direct_handler")"
+            else
+                dialog --title "Missing Config" \
+                       --msgbox "Could not find 'EVENT_HANDLER' in:\n$RESOLVED_CONFIG_FILE\n\nPlease add 'EVENT_HANDLER=/path/to/script.tcl' to your config file." \
+                       16 60
+                return 1
+            fi
+        else
+            dialog --title "Critical Error" --msgbox "Config file path is unknown." 12 60
+            return 1
+        fi
+    fi
+
+    # 3. Determine the actual Event Directory
+    local EVENTS_DIR="$RESOLVED_EVENT_HANDLER_DIR"
+    
+    # Check if 'events.d' is a subdirectory (common pattern)
+    if [[ -d "$EVENTS_DIR/events.d" ]]; then
+        EVENTS_DIR="$EVENTS_DIR/events.d"
+    elif [[ ! -d "$EVENTS_DIR" ]]; then
+        dialog --title "Directory Missing" \
+               --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$RESOLVED_EVENT_HANDLER_DIR" \
+               12 60
+        return 1
+    fi
+
+    # 4. Proceed with file listing (Standard logic)
+    if ! ls "$EVENTS_DIR"/*.tcl >/dev/null 2>&1; then
+        dialog --title "No Events" --msgbox "No .tcl files in $EVENTS_DIR" 10 50
+        return 1
+    fi
+
+    #  Verify .tcl files exist
+    if ! ls "$EVENTS_DIR"/*.tcl >/dev/null 2>&1; then
+        dialog --title "No Events Found" \
+               --msgbox "No .tcl files found in the strict path:\n$EVENTS_DIR" \
+               12 60
+        return 1
+    fi
+
+    #  Proceed to list/edit (Same logic as before)
     local -a tcl_files=()
     local -A seen_files=()
 
-    # Add local files first
-    if [[ -d "$LOCAL_EVENTS_DIR" ]]; then
+    # Check for local overrides
+    if [[ -d "$EVENTS_DIR/local" ]]; then
         while IFS= read -r -d '' file; do
             local base
             base=$(basename "$file")
             tcl_files+=("$file")
             seen_files["$base"]=1
-        done < <(
-            find "$LOCAL_EVENTS_DIR" \
-                -maxdepth 1 \
-                -type f \
-                -name "*.tcl" \
-                -print0 | sort -z
-        )
+        done < <(find "$EVENTS_DIR/local" -maxdepth 1 -type f -name "*.tcl" -print0 | sort -z)
     fi
 
-    # Add main files only if not overridden locally
+    # Add main files
     while IFS= read -r -d '' file; do
         local base
         base=$(basename "$file")
         if [[ -z "${seen_files[$base]:-}" ]]; then
             tcl_files+=("$file")
         fi
-    done < <(
-        find "$EVENTS_DIR" \
-            -maxdepth 1 \
-            -type f \
-            -name "*.tcl" \
-            -print0 | sort -z
-    )
+    done < <(find "$EVENTS_DIR" -maxdepth 1 -type f -name "*.tcl" -print0 | sort -z)
+
+    # (Rest of the menu/edit logic remains the same...)
+    # ... [Insert your existing menu building and editing logic here] ...
+    
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${EVENTS_DIR}"
@@ -395,7 +481,7 @@ action_edit_events() {
     for file in "${tcl_files[@]}"; do
         local display_name
         display_name=$(basename "$file")
-        if [[ "$file" == "$LOCAL_EVENTS_DIR"/* ]]; then
+        if [[ "$file" == "$EVENTS_DIR/local"/* ]]; then
             display_name="${display_name} (modified)"
         fi
         menu_items+=("$idx" "$display_name")
@@ -424,9 +510,9 @@ action_edit_events() {
         return
     fi
 
-    if [[ ! -d "$LOCAL_EVENTS_DIR" ]]; then
-        sudo mkdir -p "$LOCAL_EVENTS_DIR" || {
-            show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
+    if [[ ! -d "$EVENTS_DIR/local" ]]; then
+        sudo mkdir -p "$EVENTS_DIR/local" || {
+            show_result "Error" "Failed to create local events directory:\n${$EVENTS_DIR/local}"
             return
         }
     fi
@@ -442,7 +528,7 @@ action_edit_events() {
 
     trap 'sudo rm -f "$temp_file"' RETURN
 
-    if ! sudo cp "$selected_file" "$temp_file"; then
+    if ! sudo cp -p "$selected_file" "$temp_file"; then
         show_result "Error" "Failed to prepare temporary file"
         return
     fi
@@ -467,13 +553,13 @@ action_edit_events() {
     fi
 
     [[ "$save_name" != *.tcl ]] && save_name="${save_name}.tcl"
-    sudo mkdir -p "$LOCAL_EVENTS_DIR" || {
-        show_result "Error" "Failed to create local events directory:\n${LOCAL_EVENTS_DIR}"
+    sudo mkdir -p "$EVENTS_DIR/local" || {
+        show_result "Error" "Failed to create local events directory:\n${$EVENTS_DIR/local}"
         return
     }
 
-    local local_file="${LOCAL_EVENTS_DIR}/${save_name}"
-    if ! sudo cp "$temp_file" "$local_file"; then
+    local local_file="$EVENTS_DIR/local/$save_name"
+    if ! sudo cp -p "$temp_file" "$local_file"; then
         show_result "Error" "Failed to save edited file to:\n${local_file}"
         return
     fi
@@ -482,73 +568,181 @@ action_edit_events() {
 # =============================================================================
 # Edit Config added by VK5TRM
 # =============================================================================
-
 action_edit_config() {
-    if [[ ! -d "$CONFIG_DIR" ]]; then
-        show_result "Error" "Config directory not found:\n${CONFIG_DIR}"
-        return
+    # Ensure we have a temp file for dialog output
+    DIALOG_OUT=$(mktemp)
+    trap "rm -f '$DIALOG_OUT'" EXIT
+
+    # 1. Resolve Config Directory
+    # We call the function directly and check its exit status
+    if ! resolve_config_from_env; then
+        # If the function failed, it likely printed an error. 
+        # But let's be explicit in case it didn't.
+        dialog --title "CRITICAL ERROR" --msgbox "Failed to resolve config path." 12 70
+        return 1
     fi
 
+    local conf_dir="$RESOLVED_CONFIG_DIR"
+    
+    # Debug Output (Remove this block if you want it silent in production)
+#     dialog --title "[DEBUG]" --msgbox " Resolved Config Dir: $conf_dir" 10 70
+
+    if [[ ! -d "$conf_dir" ]]; then
+        dialog --title "Error" --msgbox "Config directory not found:\n$conf_dir" 10 70
+        return 1
+    fi
+
+    # 2. Find all .conf files
     local -a conf_files=()
+    
+    # Use a subshell to avoid variable leakage, but capture output safely
     while IFS= read -r -d '' file; do
         conf_files+=("$file")
-    done < <(
-        find "$CONFIG_DIR" \
-            -maxdepth 2 \
-            -type f \
-            -name "*.conf" \
-            -print0 | sort -z
-    )
+    done < <(find "$conf_dir" -maxdepth 2 -type f -name "*.conf" -print0 2>/dev/null | sort -z)
 
     if [[ ${#conf_files[@]} -eq 0 ]]; then
-        show_result "No Config Files" "No .conf files found in:\n${CONFIG_DIR}"
-        return
+        dialog --title "No Config Files" --msgbox "No Config files found in:\n$conf_dir\n\nMake sure the directory is correct." 12 70
+        return 1
     fi
 
+    # 3. Build Menu Items
     local -a menu_items=()
     local idx=1
     for file in "${conf_files[@]}"; do
         local display_name
         display_name=$(basename "$file")
+        # Escape special characters for dialog if necessary, though basename usually safe
         menu_items+=("$idx" "$display_name")
         ((idx++))
     done
 
-    local cmd
-    if [[ "$DIALOG" == "dialog" ]]; then
-        cmd="dialog --colors --no-shadow --title ' Select Config ' --menu '\nChoose a .conf file to edit:\n' 16 70 7"
+    # 4. Show Selection Dialog (Direct Call, No Eval)
+    local choice
+    # Check if 'dialog' exists
+    if ! command -v dialog &> /dev/null; then
+        dialog --title "Error" --msgbox "The 'dialog' command is not installed.\n\nPlease install it (e.g., apt install dialog)." 10 70
+        return 1
     fi
 
-    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
-    eval "$cmd" || return
+    # Run dialog directly
+    dialog --colors --no-shadow --title " Select Config " \
+        --menu "\nChoose a Config file to edit:\n" 16 70 "${#menu_items[@]}" \
+        "${menu_items[@]}" 2>"$DIALOG_OUT"
 
-    local choice
+    local dialog_status=$?
+
+    if [[ $dialog_status -ne 0 ]]; then
+        # User pressed Cancel or ESC
+        if [[ $dialog_status -eq 255 ]]; then
+             # Often indicates a display issue or cancel
+             dialog --title "[DEBUG]" --msgbox " Dialog cancelled or error (Status: $dialog_status)" >&2
+        fi
+        rm -f "$DIALOG_OUT"
+        return 0 # Return 0 to exit gracefully on cancel
+    fi
+
+    # 5. Read Choice
+    if [[ ! -f "$DIALOG_OUT" ]] || [[ ! -s "$DIALOG_OUT" ]]; then
+        dialog --title "Error" --msgbox "Failed to read dialog output.\n\nDialog Output File: $DIALOG_OUT" 10 70
+        return 1
+    fi
+
     choice=$(<"$DIALOG_OUT")
+    rm -f "$DIALOG_OUT" # Clean up immediately
 
+    # Validate Choice
     if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return
+        dialog --title "Error" --msgbox "Invalid selection received." 8 70
+        return 1
+    fi
+
+    if (( choice < 1 || choice > ${#conf_files[@]} )); then
+        dialog --title "Error" --msgbox "Selection out of range.\n\nYou chose: $choice\nAvailable: ${#conf_files[@]}" 10 70
+        return 1
     fi
 
     local selected_file="${conf_files[$((choice - 1))]}"
 
+    # 6. Edit File
     if [[ ! -f "$selected_file" ]]; then
-        show_result "Error" "File not found:\n${selected_file}"
-        return
+        dialog --title "Error" --msgbox "File not found anymore:\n$selected_file" 8 70
+        return 1
     fi
 
-    sudo $EDITOR "$selected_file"
+    # Determine Editor
+    local editor_cmd="${EDITOR:-nano}"
+    if ! command -v "$editor_cmd" &> /dev/null; then
+        editor_cmd="nano" # Fallback
+    fi
+
+    # Run editor
+    # Using sudo -E to preserve environment if needed, or just sudo
+    sudo "$editor_cmd" "$selected_file"
 }
 
 # =============================================================================
 # Edit Module event Files added by VK5TRM
 # =============================================================================
-
 action_edit_module_event_files() {
+    # 1. Resolve Config
+    if ! resolve_config_from_env; then
+        dialog --title "Config Error" --msgbox "Failed to resolve config." 12 60
+        return 1
+    fi
+
+    # 2. SAFETY CHECK: Verify the variable was actually set
+    if [[ -z "$RESOLVED_EVENT_HANDLER_DIR" ]]; then
+        
+        # LAST RESORT: Read directly from the config file if the variable failed
+        if [[ -n "$RESOLVED_CONFIG_FILE" ]]; then
+            local direct_handler
+            direct_handler=$(grep -E "^EVENT_HANDLER=" "$RESOLVED_CONFIG_FILE" | head -1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed "s/^['\"]//;s/['\"]$//")
+            
+            if [[ -n "$direct_handler" ]]; then
+                RESOLVED_EVENT_HANDLER_DIR="$(dirname "$direct_handler")"
+            else
+                dialog --title "Missing Config" \
+                       --msgbox "Could not find 'EVENT_HANDLER' in:\n$RESOLVED_CONFIG_FILE\n\nPlease add 'EVENT_HANDLER=/path/to/script.tcl' to your config file." \
+                       16 60
+                return 1
+            fi
+        else
+            dialog --title "Critical Error" --msgbox "Config file path is unknown." 12 60
+            return 1
+        fi
+    fi
+
+    # 3. Determine the actual Event Directory
+    local EVENTS_DIR="$RESOLVED_EVENT_HANDLER_DIR"
+    local MODULES_EVENTS_DIR=""
+
+    # Check if 'modules.d' is a subdirectory
+    if [[ -d "$EVENTS_DIR/modules.d" ]]; then
+        MODULES_EVENTS_DIR="$EVENTS_DIR/modules.d"
+    else
+        # Fallback: If modules.d doesn't exist, check if the base dir itself contains the files
+        # OR fail if the base dir doesn't exist either
+        if [[ ! -d "$EVENTS_DIR" ]]; then
+            dialog --title "Directory Missing" \
+                   --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$EVENTS_DIR\n\nAlso checked for 'modules.d' subfolder." \
+                   12 60
+            return 1
+        fi
+        
+        # For now, let's error out if modules.d is missing, as per your original intent
+        dialog --title "Directory Missing" \
+               --msgbox "Required 'modules.d' directory not found inside:\n$EVENTS_DIR\n\nPlease create it or move your files there." \
+               12 60
+        return 1
+    fi
+
+    # 4. Verify the final target directory exists
     if [[ ! -d "$MODULES_EVENTS_DIR" ]]; then
         show_result "Error" "Module events directory not found:\n${MODULES_EVENTS_DIR}"
         return
     fi
 
+    # 5. Find TCL files
     local -a tcl_files=()
     while IFS= read -r -d '' file; do
         tcl_files+=("$file")
@@ -565,6 +759,7 @@ action_edit_module_event_files() {
         return
     fi
 
+    # 6. Build Menu Items
     local -a menu_items=()
     local idx=1
     for file in "${tcl_files[@]}"; do
@@ -574,129 +769,205 @@ action_edit_module_event_files() {
         ((idx++))
     done
 
+    # 7. Execute Dialog
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
-        cmd="dialog --colors --no-shadow --title ' Select Module TCL File ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
+        # Use an array for safety instead of eval
+        local dialog_cmd=(dialog --colors --no-shadow --title " Select Module TCL File " --menu '\nChoose a .tcl file to edit:\n' 16 70 7)
+        for ((i=0; i<${#menu_items[@]}; i+=2)); do
+            dialog_cmd+=("${menu_items[$i]}" "${menu_items[$((i+1))]}")
+        done
+        
+        local DIALOG_OUT
+        DIALOG_OUT=$(mktemp)
+        trap 'rm -f "$DIALOG_OUT"' EXIT
+
+        if ! "${dialog_cmd[@]}" 2>"$DIALOG_OUT"; then
+            rm -f "$DIALOG_OUT"
+            return
+        fi
+
+        local choice
+        choice=$(<"$DIALOG_OUT")
+        rm -f "$DIALOG_OUT"
+
+        if [[ -z "$choice" ]] || ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+            return
+        fi
+
+        local selected_file="${tcl_files[$((choice - 1))]}"
+
+        if [[ ! -f "$selected_file" ]]; then
+            show_result "Error" "File not found:\n${selected_file}"
+            return
+        fi
+
+        # 8. Edit the file
+        # Ensure EDITOR is set
+        local editor_cmd="${EDITOR:-nano}"
+        sudo "$editor_cmd" "$selected_file"
+    else
+        dialog --msgbox "Error: 'dialog' utility not found." 10 50
+        return 1
     fi
-
-    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
-    eval "$cmd" || return
-
-    local choice
-    choice=$(<"$DIALOG_OUT")
-
-    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return
-    fi
-
-    local selected_file="${tcl_files[$((choice - 1))]}"
-
-    if [[ ! -f "$selected_file" ]]; then
-        show_result "Error" "File not found:\n${selected_file}"
-        return
-    fi
-
-    sudo $EDITOR "$selected_file"
 }
 
 # =============================================================================
 # NEW FUNCTION: List and Switch Voices from Git Repository added by VK5TRM
 # =============================================================================
-
 action_list_voices() {
-    # Check if git is available
+    # 1. Check if git is available
     if ! command -v git &>/dev/null; then
         show_result "Error" "git is not installed.\n\nInstall it with:\n  sudo apt install git"
         return 1
     fi
 
-    # Ensure SOUND_DIR is set
-    if [[ -z "$SOUND_DIR" ]]; then
-        show_result "Error" "SOUND_DIR is not defined."
+    # 2. Resolve Config
+    if ! resolve_config_from_env; then
+        dialog --title "Config Error" --msgbox "Failed to resolve config." 12 60
         return 1
     fi
 
+    # 3. SAFETY CHECK: Verify the variable was actually set
+    if [[ -z "$RESOLVED_EVENT_HANDLER_DIR" ]]; then
+        if [[ -n "$RESOLVED_CONFIG_FILE" ]]; then
+            local direct_handler
+            direct_handler=$(grep -E "^EVENT_HANDLER=" "$RESOLVED_CONFIG_FILE" | head -1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed "s/^['\"]//;s/['\"]$//")
+            
+            if [[ -n "$direct_handler" ]]; then
+                RESOLVED_EVENT_HANDLER_DIR="$(dirname "$direct_handler")"
+            else
+                dialog --title "Missing Config" --msgbox "Could not find 'EVENT_HANDLER' in:\n$RESOLVED_CONFIG_FILE" 16 60
+                return 1
+            fi
+        else
+            dialog --title "Critical Error" --msgbox "Config file path is unknown." 12 60
+            return 1
+        fi
+    fi
+
+    # 4. Determine the actual Sound Directory
+    local EVENTS_DIR="$RESOLVED_EVENT_HANDLER_DIR"
+    local SOUND_DIR=""
+
+    # Check if 'sounds' is a subdirectory
+    if [[ -d "$EVENTS_DIR/sounds" ]]; then
+        SOUND_DIR="$EVENTS_DIR/sounds"
+    else
+        # Fallback: Check if base dir exists
+        if [[ ! -d "$EVENTS_DIR" ]]; then
+            dialog --title "Directory Missing" --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$EVENTS_DIR" 12 60
+            return 1
+        fi
+        
+        # If base exists but no 'sounds' subfolder, fail strictly
+        dialog --title "Directory Missing" --msgbox "Required 'sounds' directory not found inside:\n$EVENTS_DIR\n\nPlease create it or move your files there." 12 60
+        return 1
+    fi
+
+    # Verify final target
     if [[ ! -d "$SOUND_DIR" ]]; then
-        show_result "Error" "Sound directory not found:\n${SOUND_DIR}"
+        show_result "Error" "Sounds directory not found:\n${SOUND_DIR}"
         return 1
-    fi
+    fi  
 
-    # Collect directories into an array properly
+    # 5. Collect Directories (Voices)
     local -a DIRS=()
     while IFS= read -r -d '' dir; do
         DIRS+=("$dir")
     done < <(find "$SOUND_DIR" -maxdepth 1 -mindepth 1 -type d -print0 | sort -z)
 
     if [[ ${#DIRS[@]} -eq 0 ]]; then
-        show_result "No Directories found in:\n${SOUND_DIR}"
+        show_result "No Directories" "No voice directories found in:\n${SOUND_DIR}"
         return 1
     fi
 
-    # Build menu items
+    # 6. Build Menu Items for Directories
     local -a menu_items=()
     local idx=1
     for dir in "${DIRS[@]}"; do
-        local display_name
-        display_name=$(basename "$dir")
-        menu_items+=("$idx" "$display_name")
+        menu_items+=("$idx" "$(basename "$dir")")
         ((idx++))
     done
 
-    # Determine command based on tool availability
-    local cmd
-    local title_menu="Select Directory"
-    local prompt_msg="Choose a directory:"
+    # 7. Execute Directory Selection Menu
+    local DIALOG_OUT
+    DIALOG_OUT=$(mktemp)
+    trap 'rm -f "$DIALOG_OUT"' EXIT
 
+    local selected_dir=""
     if [[ "$DIALOG" == "dialog" ]]; then
-        cmd="dialog --colors --no-shadow --title ' $title_menu ' --menu '$prompt_msg' 16 70 ${#DIRS[@]}"
+        # Use array construction for safety
+        local dialog_cmd=(dialog --colors --no-shadow --title " Select Voice Directory " --menu '\nChoose a voice repository:' 16 70 7)
+        for ((i=0; i<${#menu_items[@]}; i+=2)); do
+            dialog_cmd+=("${menu_items[$i]}" "${menu_items[$((i+1))]}")
+        done
+        
+        if ! "${dialog_cmd[@]}" 2>"$DIALOG_OUT"; then
+            return 0 # User cancelled
+        fi
+        
+        local choice
+        choice=$(<"$DIALOG_OUT")
+        
+        if [[ -z "$choice" ]] || ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+            return 0
+        fi
+
+        selected_dir="${DIRS[$((choice - 1))]}"
+    else
+        dialog --msgbox "Error: 'dialog' utility not found." 10 50
+        return 1
     fi
-
-    # Execute menu and capture choice
-    # Note: We pass the menu items array expanded
-    eval "$cmd" "${menu_items[@]}" 2>"$DIALOG_OUT"
-
-    local choice
-    choice=$(<"$DIALOG_OUT")
-
-    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
-        return 0 # User cancelled
-    fi
-
-    # Get the selected directory path
-    local selected_dir="${DIRS[$((choice - 1))]}"
 
     if [[ ! -d "$selected_dir" ]]; then
         show_result "Error" "Directory not found:\n${selected_dir}"
         return 1
     fi
 
-     # Get list of branches (voices) from the selected directory
+    # 8. Get list of branches (voices) from the selected directory
     local -a voices=()
     local default_branch=""
+    
+    # Check if it's a git repo
+    if [[ ! -d "$selected_dir/.git" ]]; then
+        # If not a git repo, treat the whole dir as the voice
+        # Create symlink if needed
+        local lnk="$SOUND_DIR/en_US"
+        if [[ -L "$lnk" ]]; then
+            sudo rm "$lnk"
+        fi
+        sudo ln -sf "$selected_dir" "$lnk"
+        show_result "Success" "Linked non-git directory to:\n$lnk"
+        return 0
+    fi
+
     while IFS= read -r branch; do
-        # Remove refs/heads/ prefix
         branch="${branch#refs/heads/}"
-       if [[ "$branch" == "main" || "$branch" == "master" ]]; then
+        if [[ "$branch" == "main" || "$branch" == "master" ]]; then
             default_branch="$branch"
             continue
         fi
         voices+=("$branch")
     done < <(git --git-dir="$selected_dir/.git" for-each-ref refs/heads/ --format='%(refname)' 2>/dev/null)
-     lnk="$SOUND_DIR"'/en_US'
-     if [[ ${#voices[@]} -eq 0 ]]; then
+
+    # Handle case with NO branches (just a default or non-git folder inside)
+    if [[ ${#voices[@]} -eq 0 ]]; then
         if [[ -n "$default_branch" ]]; then
+            # Auto-switch to default
             action_switch_voice "$default_branch" "$selected_dir"
             return 0
-      else
-            sudo rm -rf "$lnk"
+        else
+            # No branches at all? Maybe it's just a raw directory with files?
+            local lnk="$SOUND_DIR/en_US"
+            sudo rm -f "$lnk"
             sudo ln -sf "$selected_dir" "$lnk"
-            show_result "No Branches Found" "Directory may still contain audio files."
+            show_result "Linked" "Directory linked to:\n$lnk\n(No git branches found)"
             return 0
-           fi
+        fi
     fi
 
-
-    # Build menu items for voices
+    # 9. Build Menu Items for Voices
     local -a voice_menu_items=()
     local v_idx=1
     for voice in "${voices[@]}"; do
@@ -704,25 +975,37 @@ action_list_voices() {
         ((v_idx++))
     done
 
-    # Display voices menu
+    # 10. Display Voices Menu
+    local v_choice=""
     if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Available Voices " \
-            --menu "\nSelect a voice to display details:\n" 16 70 ${#voices[@]} \
-            "${voice_menu_items[@]}" 2>"$DIALOG_OUT" || return 0
+        local voice_cmd=(dialog --colors --no-shadow --title " Available Voices " --menu '\nSelect a voice to checkout:' 16 70 7)
+        for ((i=0; i<${#voice_menu_items[@]}; i+=2)); do
+            voice_cmd+=("${voice_menu_items[$i]}" "${voice_menu_items[$((i+1))]}")
+        done
+        
+        if ! "${voice_cmd[@]}" 2>"$DIALOG_OUT"; then
+            return 0
+        fi
+        v_choice=$(<"$DIALOG_OUT")
+    else
+        dialog --msgbox "Error: 'dialog' utility not found." 10 50
+        return 1
     fi
 
-    local v_choice
-    v_choice=$(<"$DIALOG_OUT")
-
-    if [[ -z "$v_choice" ]] || [[ ! "$v_choice" =~ ^[0-9]+$ ]]; then
+    if [[ -z "$v_choice" ]] || ! [[ "$v_choice" =~ ^[0-9]+$ ]]; then
         return 0
     fi
 
     local selected_voice="${voices[$((v_choice - 1))]}"
 
-    if [[ $? -eq 0 ]]; then
+    # 11. Switch Voice
+    if [[ -n "$selected_voice" ]]; then
         action_switch_voice "$selected_voice" "$selected_dir"
     fi
+    
+    # Cleanup trap
+    rm -f "$DIALOG_OUT"
+    trap - EXIT
 }
 
 action_switch_voice() {
@@ -865,96 +1148,172 @@ action_health_check() {
 # =============================================================================
 
 action_devcal_sections() {
-    conf=$(resolve_config_from_env)
+    # 1. Resolve Config
+    if ! resolve_config_from_env; then
+        dialog --title "Error" --msgbox "Failed to resolve config path." 8 60
+        return 1
+    fi
+
+    local conf="$RESOLVED_CONFIG_FILE"
+    local dir="$RESOLVED_CONFIG_DIR"
 
     if [[ ! -f "$conf" ]]; then
-        show_result "Error" "Config file not found:\n${conf}"
-        return
+        dialog --title "Error" --msgbox "Config file not found:\n$conf" 8 60
+        return 1
     fi
 
-    # Extract all RepeaterLogic and SimplexLogic section names with their RX and TX values
-    local logics=()
-    local current_section=""
-    local current_rx=""
-    local current_tx=""
+    # 2. Extract Logic Entries (RX & TX) using AWK
+    # Format: Section|RX_Sections|TX_Sections
+    local logics_raw
+    logics_raw=$(awk '
+        BEGIN { section="" }
+        
+        # Detect Section Header [SectionName]
+        /^\[.*\]/ {
+            sub(/^\[/, ""); sub(/\]$/, "")
+            gsub(/^[ \t]+/, ""); gsub(/[ \t]+$/, "")
+            section = $0
+            next
+        }
 
-    while IFS= read -r line; do
-        # Check if this is a RepeaterLogic or SimplexLogic section header
-        if [[ "$line" =~ ^\[(RepeaterLogic|SimplexLogic)[^]]*\] ]]; then
-            # Save previous section if it has RX and TX
-            if [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]]; then
-                logics+=("$current_section|$current_rx|$current_tx")
-            fi
+        # Process RepeaterLogic or SimplexLogic
+        (section == "RepeaterLogic" || section == "SimplexLogic") {
+            lower_line = tolower($0)
+            
+            # Extract RX
+            if (lower_line ~ /^[ \t]*rx[ \t]*=/) {
+                eq_pos = index($0, "=")
+                if (eq_pos > 0) {
+                    val = substr($0, eq_pos + 1)
+                    gsub(/^[ \t"]+/, "", val)
+                    gsub(/[ \t"]+$/, "", val)
+                    if (val != "") rx_val = val
+                }
+            }
+            
+            # Extract TX
+            if (lower_line ~ /^[ \t]*tx[ \t]*=/) {
+                eq_pos = index($0, "=")
+                if (eq_pos > 0) {
+                    val = substr($0, eq_pos + 1)
+                    gsub(/^[ \t"]+/, "", val)
+                    gsub(/[ \t"]+$/, "", val)
+                    if (val != "") tx_val = val
+                }
+            }
+        }
+        
+        # When a new section starts or file ends, print the previous one if valid
+        # We handle the "last section" by printing when we hit a new section or END
+        # But simpler: print whenever we have both RX and TX at the start of a new section or END
+    ' "$conf" 2>&1)
+
+    # The above AWK logic needs a small tweak to print the results. 
+    # Let's use a simpler "State Machine" approach in AWK to ensure we print correctly.
+    
+    logics_raw=$(awk '
+        BEGIN { section=""; rx=""; tx="" }
+        
+        /^\[.*\]/ {
+            # If we just finished a logic section, print it
+            if (section == "RepeaterLogic" || section == "SimplexLogic") {
+                if (rx != "" && tx != "") {
+                    print section "|" rx "|" tx
+                }
+            }
             # Start new section
-            current_section="${BASH_REMATCH[0]}"
-            current_section="${current_section%]}"
-            current_section="${current_section#[}"
-            current_rx=""
-            current_tx=""
-        # Extract RX value
-        elif [[ "$line" =~ ^RX= ]]; then
-            current_rx="${line#RX=}"
-            current_rx="${current_rx// /}"  # Remove spaces
-        # Extract TX value
-        elif [[ "$line" =~ ^TX= ]]; then
-            current_tx="${line#TX=}"
-            current_tx="${current_tx// /}"  # Remove spaces
-        fi
-    done < "$conf"
+            sub(/^\[/, ""); sub(/\]$/, "")
+            gsub(/^[ \t]+/, ""); gsub(/[ \t]+$/, "")
+            section = $0
+            rx = ""; tx = ""
+            next
+        }
 
-    # Don't forget the last section
-    if [[ -n "$current_section" && -n "$current_rx" && -n "$current_tx" ]]; then
-        logics+=("$current_section|$current_rx|$current_tx")
+        (section == "RepeaterLogic" || section == "SimplexLogic") {
+            lower_line = tolower($0)
+            if (lower_line ~ /^[ \t]*rx[ \t]*=/) {
+                eq_pos = index($0, "=")
+                if (eq_pos > 0) {
+                    val = substr($0, eq_pos + 1)
+                    gsub(/^[ \t"]+/, "", val)
+                    gsub(/[ \t"]+$/, "", val)
+                    rx = val
+                }
+            }
+            if (lower_line ~ /^[ \t]*tx[ \t]*=/) {
+                eq_pos = index($0, "=")
+                if (eq_pos > 0) {
+                    val = substr($0, eq_pos + 1)
+                    gsub(/^[ \t"]+/, "", val)
+                    gsub(/[ \t"]+$/, "", val)
+                    tx = val
+                }
+            }
+        }
+        
+        END {
+            # Print the last section if valid
+            if (section == "RepeaterLogic" || section == "SimplexLogic") {
+                if (rx != "" && tx != "") {
+                    print section "|" rx "|" tx
+                }
+            }
+        }
+    ' "$conf" 2>&1)
+
+    # Check if found
+    if [[ -z "$logics_raw" ]]; then
+        dialog --title "Error" --msgbox "No RepeaterLogic or SimplexLogic sections with RX/TX found.\n\nCheck config file format." 12 60
+        return 1
     fi
 
-    if [[ ${#logics[@]} -eq 0 ]]; then
-        show_result "No Logics Found" "No RepeaterLogic or SimplexLogic sections found in:\n${conf}"
-        return
-    fi
+    # 3. Build Menu
+    local logics=()
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && logics+=("$line")
+    done <<< "$logics_raw"
 
-    # Create menu items from logics
     local items=()
     local i=1
     for logic in "${logics[@]}"; do
         local section="${logic%%|*}"
-        local rx="${logic#*|}"
-        rx="${rx%%|*}"
+        local rx="${logic#*|}"; rx="${rx%%|*}"
         local tx="${logic##*|}"
         items+=("$i" "$section (RX: $rx / TX: $tx)")
         ((i++))
     done
 
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Select Logic " \
-            --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" \
-            "${items[@]}" 2>"$DIALOG_OUT" || return
+    # 4. Show Logic Selection Menu
+    local choice
+    dialog --colors --no-shadow --title "Select Logic" \
+        --menu "\nChoose a logic section:\n" 16 70 "${#items[@]}" \
+        "${items[@]}" 2>"$DIALOG_OUT" || return
+
+    choice=$(<"$DIALOG_OUT")
+
+    if [[ ! "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#logics[@]} )); then
+        dialog --title "Error" --msgbox "Invalid selection." 8 60
+        return 1
     fi
 
-    local choice
-    choice=$(<"$DIALOG_OUT")
     local selected_logic="${logics[$((choice - 1))]}"
-
-    # Parse the selected logic using pipe delimiter
-    local rx_section="${selected_logic#*|}"
-    rx_section="${rx_section%%|*}"
+    local section_name="${selected_logic%%|*}"
+    local rx_section="${selected_logic#*|}"; rx_section="${rx_section%%|*}"
     local tx_section="${selected_logic##*|}"
 
-    # Show RX/TX selection menu
+    # 5. Show RX/TX Selection Menu
     local rxtx_items=(
         "1" "RX: $rx_section"
         "2" "TX: $tx_section"
     )
 
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Select RX or TX " \
-            --menu "\nChoose which to calibrate:\n" 12 40 2 \
-            "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
-    fi
+    dialog --colors --no-shadow --title "Select RX or TX" \
+        --menu "\nChoose which to calibrate:\n" 12 40 2 \
+        "${rxtx_items[@]}" 2>"$DIALOG_OUT" || return
 
     local rxtx_choice
     rxtx_choice=$(<"$DIALOG_OUT")
 
-    # Determine which section and flag to use
     local section
     local flag
     if [[ "$rxtx_choice" == "1" ]]; then
@@ -964,90 +1323,118 @@ action_devcal_sections() {
         section="$tx_section"
         flag="-t"
     fi
+
+    # 6. Stop Service
     if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
         clear
         echo "=== Stopping svxlink service ==="
         sudo systemctl stop svxlink.service
         sleep 2
     fi
-    # Run devcal
-        clear
-        echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
-    if [[ "$flag" == -r ]]; then
+
+    # 7. Run devcal
+    clear
+    echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
+    
+    if [[ "$flag" == "-r" ]]; then
         echo "== Recommended setup for measurement:"
-        echo " Please set a RF signal generator on the Frequency you are using at 1000 Hz tone 2400 Hz deviation "
-        echo "    1. Adjust level using Alsamixer to as close as you can to 2400 Hz (coarce ajustment)"
-        echo "    2. Adjust level using + or - in devcal (fine adjustment)"
-        echo "    3. Put the PREAMP= dB level into your svxlink.conf RX section."
-        echo "    4. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
+        echo "   1. Set RF signal generator to your frequency with 1000 Hz tone, 2400 Hz deviation."
+        echo "   2. Adjust level using Alsamixer for coarse adjustment."
+        echo "   3. Use + or - in devcal for fine adjustment."
+        echo "   4. Record PREAMP= dB value into svxlink.conf RX section."
+        echo "   Note: -12 dBFS corresponds to 2404 Hz deviation."
     else
         echo "== Recommended setup for measurement:"
-        echo "   - Hit T on keyboard to transmit"
-        echo "   - Use a deviation meter if available OR"
-        echo "   - Use the Bessel 0 Null method:"
-        echo "       2. Devcal will apply a sinusoidal modulating tone of 1000 Hz."
-        echo "       2. Adjust the modulation until the carrier is minimized."
-        echo "       3. Use Alsamixer for coarce adjustment then + or - in devcal for fine adjustment"
-        echo "       4. Put the MASTER_GAIN= dB value into your svxlink.conf TX section"
-        echo "       5. This corresponds to a frequency deviation of 2404 Hz or -12 dBFS and -9 dBFS at 3500 Hz deviation."
-        echo "   - If using an SSB receiver, tune to the carrier frequency -1 kHz for proper observation."
+        echo "   1. Hit T on keyboard to transmit."
+        echo "   2. Use a deviation meter OR Bessel 0 Null method."
+        echo "   3. devcal applies 1000 Hz tone."
+        echo "   4. Adjust modulation until carrier is minimized."
+        echo "   5. Use Alsamixer (coarse) then + or - in devcal (fine)."
+        echo "   6. Record MASTER_GAIN= dB value into svxlink.conf TX section."
+        echo "   Note: SSB receivers should tune to carrier -1 kHz."
     fi
     echo ""
+
     (
         trap 'exit 0' INT
-        devcal ${flag} "$conf" "$section"
+        # devcal [flag] [config] [section]
+        devcal "$flag" "$conf" "$section"
     )
 
-    show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
+    dialog --title "Calibration Complete" --msgbox "Don't forget to restart svxlink!\n\nYou can do this from the main menu." 8 60
 }
 
 # =============================================================================
 # NEW FUNCTION: siglevdetcal with Section Selection added by VK5TRM
 # =============================================================================
-
 action_siglevdetcal() {
-    conf=$(resolve_config_from_env)
+    # 1. Resolve Config
+    if ! resolve_config_from_env; then
+        dialog --title "Error" --msgbox "Failed to resolve config path." 8 60
+        return 1
+    fi
+
+    local conf="$RESOLVED_CONFIG_FILE"
+    local dir="$RESOLVED_CONFIG_DIR"
 
     if [[ ! -f "$conf" ]]; then
-        show_result "Error" "Config file not found:\n${conf}"
-        return
+        dialog --title "Error" --msgbox "Config file not found:\n$conf" 8 60
+        return 1
     fi
 
-    # Extract all RepeaterLogic and SimplexLogic section names with their RX values
+    # 2. Extract Logic Entries (Visible Debug Mode)
+    local logics_raw
+    local debug_output=""
+
+    # Run AWK and capture output
+    logics_raw=$(awk '
+        BEGIN { section="" }
+        
+        # Detect Section Header
+        /^\[.*\]/ {
+            sub(/^\[/, ""); sub(/\]$/, "")
+            gsub(/^[ \t]+/, ""); gsub(/[ \t]+$/, "")
+            section = $0
+            next
+        }
+
+        # Process RepeaterLogic or SimplexLogic
+        (section == "RepeaterLogic" || section == "SimplexLogic") {
+            lower_line = tolower($0)
+            if (lower_line ~ /^[ \t]*rx[ \t]*=/) {
+                eq_pos = index($0, "=")
+                if (eq_pos > 0) {
+                    val = substr($0, eq_pos + 1)
+                    gsub(/^[ \t"]+/, "", val)
+                    gsub(/[ \t"]+$/, "", val)
+                    if (val != "") {
+                        print section "|" val
+                    }
+                }
+            }
+        }
+    ' "$conf" 2>&1)
+
+    # Check if we found anything
+    if [[ -z "$logics_raw" ]]; then
+        # Capture debug info for the dialog
+        debug_output="File: $conf\n\n"
+        debug_output+="Looking for sections: RepeaterLogic, SimplexLogic\n"
+        debug_output+="Looking for lines: RX=...\n\n"
+        debug_output+="Lines containing 'RX' in file:\n"
+        debug_output+=$(grep -i "^[[:space:]]*rx[[:space:]]*=" "$conf" 2>&1)
+        debug_output+="\n\nIf no lines appear above, check your config file format."
+
+        dialog --title "Error: No RX Found" --msgbox "$debug_output" 20 70
+        return 1
+    fi
+
+    # 3. Build Menu
     local logics=()
-    local current_section=""
-    local current_rx=""
-
     while IFS= read -r line; do
-        # Check if this is a RepeaterLogic or SimplexLogic section header
-        if [[ "$line" =~ ^\[(RepeaterLogic|SimplexLogic)[^]]*\] ]]; then
-            # Save previous section if it has RX
-            if [[ -n "$current_section" && -n "$current_rx" ]]; then
-                logics+=("$current_section|$current_rx")
-            fi
-            # Start new section
-            current_section="${BASH_REMATCH[0]}"
-            current_section="${current_section%]}"
-            current_section="${current_section#[}"
-            current_rx=""
-        # Extract RX value
-        elif [[ "$line" =~ ^RX= ]]; then
-            current_rx="${line#RX=}"
-            current_rx="${current_rx// /}"  # Remove spaces
-        fi
-    done < "$conf"
+        [[ -n "$line" ]] && logics+=("$line")
+    done <<< "$logics_raw"
 
-    # Don't forget the last section
-    if [[ -n "$current_section" && -n "$current_rx" ]]; then
-        logics+=("$current_section|$current_rx")
-    fi
-
-    if [[ ${#logics[@]} -eq 0 ]]; then
-        show_result "No RX Found" "No RX sections found in logic configurations in:\n${conf}"
-        return
-    fi
-
-    # Create menu items from logics
     local items=()
     local i=1
     for logic in "${logics[@]}"; do
@@ -1057,36 +1444,45 @@ action_siglevdetcal() {
         ((i++))
     done
 
-    if [[ "$DIALOG" == "dialog" ]]; then
-        dialog --colors --no-shadow --title " Select RX " \
-            --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" \
-            "${items[@]}" 2>"$DIALOG_OUT" || return
+    # 4. Show Menu
+    local choice
+    dialog --colors --no-shadow --title "Select RX" \
+        --menu "\nChoose an RX section:\n" 16 70 "${#items[@]}" \
+        "${items[@]}" 2>"$DIALOG_OUT" || return
+
+    choice=$(<"$DIALOG_OUT")
+
+    if [[ ! "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#logics[@]} )); then
+        dialog --title "Error" --msgbox "Invalid selection." 8 60
+        return 1
     fi
 
-    local choice
-    choice=$(<"$DIALOG_OUT")
     local selected_logic="${logics[$((choice - 1))]}"
+    local selected_section="${selected_logic%%|*}"
+    local selected_rx="${selected_logic##*|}"
 
-    # Parse the selected logic to get RX section
-    local rx_section="${selected_logic##*|}"
-
+    # 5. Stop Service
     if [[ $(systemctl is-active svxlink.service) == "active" ]]; then
         clear
-        echo "=== Stopping svxlink service ==="
+        echo "Stopping svxlink..."
         sudo systemctl stop svxlink.service
         sleep 2
     fi
 
-    # Run siglevdetcal
+    # 6. Run Calibration
     clear
-    echo "=== Running siglevdetcal $conf $rx_section (Ctrl+C to stop) ==="
+    echo "=== Running siglevdetcal ==="
+    echo "Config: $conf"
+    echo "RX Section: $selected_rx"
+    echo "(Press Ctrl+C to stop)"
     echo ""
+
     (
         trap 'exit 0' INT
-        siglevdetcal "$conf" "$rx_section"
+        siglevdetcal "$conf" "$selected_rx"
     )
 
-    show_result "Calibration Complete" "Don't forget to restart the svxlink service!\n\nYou can do this from the main menu."
+    dialog --title "Complete" --msgbox "Calibration done!\nRestart svxlink from main menu." 8 60
 }
 
 # =============================================================================
@@ -1113,7 +1509,7 @@ action_dtmf_control() {
                 link_targets+=("$resolved_target")
             fi
         fi
-    done < <(find /tmp /dev/shm -maxdepth 1 -name "dtmf*" -type l -print0 2>/dev/null)
+    done < <(find /tmp /dev/shm -maxdepth 1 -name "*dtmf*" -type l -print0 2>/dev/null)
 
     # 2. HANDLE MULTIPLE OR SINGLE FINDINGS
     local num_found=${#valid_links[@]}
@@ -1275,7 +1671,6 @@ main_menu() {
 # =============================================================================
 # Main Loop
 # =============================================================================
-
 while true; do
     main_menu || break
 
@@ -1304,5 +1699,5 @@ while true; do
     esac
 done
 
- clear
+clear
 echo "Goodbye!"
