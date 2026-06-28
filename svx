@@ -1509,7 +1509,7 @@ action_dtmf_control() {
                 link_targets+=("$resolved_target")
             fi
         fi
-    done < <(find /tmp /dev/shm -maxdepth 1 -name "*dtmf*" -type l -print0 2>/dev/null)
+    done < <(find /tmp /dev/shm  /var/spool/svxlink/ /run/svxlink -maxdepth 1 -name "*dtmf*" -type l -print0 2>/dev/null)
 
     # 2. HANDLE MULTIPLE OR SINGLE FINDINGS
     local num_found=${#valid_links[@]}
