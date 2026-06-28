@@ -1334,34 +1334,36 @@ action_devcal_sections() {
 
     # 7. Run devcal
     clear
-    echo "=== Running devcal ${flag} ${section} (Ctrl+C to stop) ==="
+    echo "================= Running devcal =========== ${section} ========== (Press Q to quit) ==="
     
     if [[ "$flag" == "-r" ]]; then
         echo "== Recommended setup for measurement:"
         echo "   1. Set RF signal generator to your frequency with 1000 Hz tone, 2400 Hz deviation."
         echo "   2. Adjust level using Alsamixer for coarse adjustment."
         echo "   3. Use + or - in devcal for fine adjustment."
-        echo "   4. Record PREAMP= dB value into svxlink.conf RX section."
+        echo "   4. Adjust so that the tone dev at the bottom left reads 2400 on devcal."
+        echo "   5. Record PREAMP= dB value into svxlink.conf RX section."
         echo "   Note: -12 dBFS corresponds to 2404 Hz deviation."
     else
         echo "== Recommended setup for measurement:"
-        echo "   1. Hit T on keyboard to transmit."
-        echo "   2. Use a deviation meter OR Bessel 0 Null method."
-        echo "   3. devcal applies 1000 Hz tone."
-        echo "   4. Adjust modulation until carrier is minimized."
-        echo "   5. Use Alsamixer (coarse) then + or - in devcal (fine)."
-        echo "   6. Record MASTER_GAIN= dB value into svxlink.conf TX section."
-        echo "   Note: SSB receivers should tune to carrier -1 kHz."
+        echo "   1.  Hit T on keyboard to transmit."
+        echo "   2.  Use a deviation meter OR Bessel 0 Null method."
+        echo "   3.  Turn off all TX CTCSS tones." 
+        echo "   4.  Start with your audio output in Alsamixer muted" 
+        echo "   5.  Use 5a or 5b method below to test TX modulation" 
+        echo "   5a. Use a spectrum analyzer zoomed right in to the carrier to see ampitude of carrier"
+        echo "   5b. Use an SSB receiver in CW mode with very narrow filters. Adjust frequency so you get a 1 kHz tone."
+        echo "   6.  Unmute Alsamixer output"
+        echo "   7.  devcal applies 1000 Hz tone."
+        echo "   8.  Adjust modulation until carrier is minimized."
+        echo "   9.  Use Alsamixer (coarse) then + or - in devcal (fine)."
+        echo "   10. Record MASTER_GAIN= dB value into svxlink.conf TX section."
+        echo "   Note: SSB receivers should tune to carrier frequency -1 kHz."
     fi
-    echo ""
-
-    (
-        trap 'exit 0' INT
-        # devcal [flag] [config] [section]
+        echo ""
         devcal "$flag" "$conf" "$section"
-    )
+        read -p "Don't forget to start svxlink again! - You can do this from the main menu. - Press enter to continue"
 
-    dialog --title "Calibration Complete" --msgbox "Don't forget to restart svxlink!\n\nYou can do this from the main menu." 8 60
 }
 
 # =============================================================================
@@ -1471,18 +1473,10 @@ action_siglevdetcal() {
 
     # 6. Run Calibration
     clear
-    echo "=== Running siglevdetcal ==="
-    echo "Config: $conf"
-    echo "RX Section: $selected_rx"
-    echo "(Press Ctrl+C to stop)"
+    echo "================ Running siglevdetcal ============ $selected_rx ============"
     echo ""
-
-    (
-        trap 'exit 0' INT
-        siglevdetcal "$conf" "$selected_rx"
-    )
-
-    dialog --title "Complete" --msgbox "Calibration done!\nRestart svxlink from main menu." 8 60
+    siglevdetcal "$conf" "$selected_rx"
+    read -p "Don't forget to start svxlink again! - You can do this from the main menu. - Press enter to continue"
 }
 
 # =============================================================================
