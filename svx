@@ -195,26 +195,117 @@ get_service_status() {
     st=$(systemctl is-active "${1}.service" 2>/dev/null) || true
     echo "${st:-unknown}"
 }
+# =============================================================================
+# Helper: Calculate Uptime from Process Start Time (Most Reliable)
+# =============================================================================
+get_service_uptime() {
+    local svc="$1"
+    local pid now start_time_sec uptime_str
+    local clk_tck boot_time
 
-# Build a status summary string for the menu title
+    # 1. Get the PID of the service
+    # Try systemctl first, fallback to pidof
+    pid=$(systemctl show "$svc" --property=MainPID --value 2>/dev/null)
+    
+    # If systemctl returns 0 or empty, try pidof
+    if [[ -z "$pid" || "$pid" == "0" ]]; then
+        # Remove .service suffix if present for pidof
+        local proc_name="${svc%.service}"
+        pid=$(pidof "$proc_name" 2>/dev/null | awk '{print $1}')
+    fi
+
+    # If no PID found, service isn't running
+    if [[ -z "$pid" || "$pid" == "0" ]]; then
+        echo "Not Running"
+        return
+    fi
+
+    # 2. Get system clock ticks per second (usually 100)
+    clk_tck=$(getconf CLK_TCK 2>/dev/null || echo 100)
+
+    # 3. Get system boot time in seconds since epoch
+    boot_time=$(awk '/btime/ {print $2}' /proc/stat)
+
+    # 4. Get process start time (in clock ticks since boot)
+    # /proc/[pid]/stat field 22 is starttime
+    local start_ticks
+    start_ticks=$(awk '{print $22}' "/proc/$pid/stat" 2>/dev/null)
+
+    if [[ -z "$start_ticks" || "$start_ticks" == "0" ]]; then
+        echo "Unknown"
+        return
+    fi
+
+    # 5. Calculate start time in epoch seconds
+    start_time_sec=$(( (boot_time) + (start_ticks / clk_tck) ))
+    now=$(date +%s)
+
+    # 6. Calculate difference
+    local diff=$((now - start_time_sec))
+    if (( diff < 0 )); then diff=0; fi
+
+    # 7. Format
+    local h=$((diff / 3600))
+    local m=$(((diff % 3600) / 60))
+    local s=$((diff % 60))
+
+    if (( h > 0 )); then
+        uptime_str="${h}h ${m}m"
+    elif (( m > 0 )); then
+        uptime_str="${m}m ${s}s"
+    else
+        uptime_str="${s}s"
+    fi
+
+    echo "$uptime_str"
+}
+
+# =============================================================================
+# Updated: build_status_title (Simplified)
+# =============================================================================
 build_status_title() {
     local title=""
+    local svc status label uptime_str
+
+    if [[ -z "${SERVICES[*]}" ]]; then
+        echo "No services defined"
+        return
+    fi
+
     for svc in "${SERVICES[@]}"; do
-        local status
+        # Ensure we have a label
+        label="${SERVICE_LABELS[$svc]:-$svc}"
         status=$(get_service_status "$svc")
-        local label="${SERVICE_LABELS[$svc]}"
-        if [[ "$DIALOG" == "dialog" ]]; then
-            case "$status" in
-                active)  title+="\Z2● ${label}\Zn  " ;;
-                failed)  title+="\Z1● ${label}\Zn  " ;;
-                *)       title+="\Z3○ ${label}\Zn  " ;;
-            esac
+
+        if [[ "$status" == "active" ]]; then
+            uptime_str=$(get_service_uptime "$svc")
+            
+            # If we got a valid uptime, show it. Otherwise show "Running"
+            if [[ "$uptime_str" != "Unknown" && "$uptime_str" != "Not Running" ]]; then
+                if [[ "$DIALOG" == "dialog" ]]; then
+                    title+="\Z2${label} (\Z2${uptime_str}\Zn)  "
+                else
+                    title+="[UP] ${label} (${uptime_str})  "
+                fi
+            else
+                if [[ "$DIALOG" == "dialog" ]]; then
+                    title+="\Z2${label} (Running)  "
+                else
+                    title+="[UP] ${label} (Running)  "
+                fi
+            fi
         else
-            case "$status" in
-                active)  title+="[UP] ${label}  " ;;
-                failed)  title+="[FAIL] ${label}  " ;;
-                *)       title+="[DOWN] ${label}  " ;;
-            esac
+            if [[ "$DIALOG" == "dialog" ]]; then
+                case "$status" in
+                    failed)  title+="\Z1${label} (Failed)  " ;;
+                    *)       title+="\Z3${label} (Down)  " ;;
+                esac
+            else
+                case "$status" in
+                    failed)  title+="[FAIL] ${label}  " ;;
+                    *)       title+="[DOWN] ${label}  " ;;
+                esac
+            fi
         fi
     done
 
@@ -230,18 +321,13 @@ build_sysinfo() {
     if [[ -r "$temp_file" ]]; then
         local raw
         raw=$(<"$temp_file")
-        info+="${temp_file:+$((raw / 1000))°C}"
+        info+=" Temp: ${temp_file:+$((raw / 1000))°C}"
     fi
 
     # Uptime
     local up
     up=$(uptime -p 2>/dev/null | sed 's/up //;s/ days\?/d/;s/ hours\?/h/;s/ minutes\?/m/;s/,//g') || true
-    [[ -n "$up" ]] && info+="  Up ${up}"
-
-    # Last boot
-    local last_boot
-    last_boot=$(uptime -s 2>/dev/null) || true
-    [[ -n "$last_boot" ]] && info+="  Since ${last_boot%:*}"
+    [[ -n "$up" ]] && info+=" Up: ${up}"
 
     echo "$info"
 }
@@ -1614,42 +1700,223 @@ action_reboot() {
 }
 
 # =============================================================================
-# Main Menu
+# Submenu Functions
 # =============================================================================
+submenu_service() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=40
+    local items=(
+        "1" "$(printf "%-${W}s" "Start service")"
+        "2" "$(printf "%-${W}s" "Stop service")"
+        "3" "$(printf "%-${W}s" "Restart service")"
+        "4" "$(printf "%-${W}s" "Enable service at boot")"
+        "5" "$(printf "%-${W}s" "Disable service at boot")"
+    )
 
+    while true; do
+        dialog --colors --no-shadow \
+            --title " Service Control " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nService Actions:\n" 20 40 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_start ;;
+            2) action_stop ;;
+            3) action_restart ;;
+            4) action_enable ;;
+            5) action_disable ;;
+            *) break ;; # Handle cancel or invalid
+        esac
+    done
+}
+
+submenu_dtmf() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=40
+    local items=(
+        "1" "$(printf "%-${W}s" "Send DTMF Command")"
+    )
+
+    while true; do
+        dialog --colors --no-shadow \
+            --title " DTMF Control " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nDTMF Actions:\n" 20 40 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_dtmf_control ;;
+            *) break ;;
+        esac
+    done
+}
+
+submenu_monitoring() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=40
+    local items=(
+        "1" "$(printf "%-${W}s" "Show detailed status")"
+        "2" "$(printf "%-${W}s" "Follow live logs")"
+        "3" "$(printf "%-${W}s" "System health check")"
+    )
+
+    while true; do
+        dialog --colors --no-shadow \
+            --title " Monitoring " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nMonitoring Actions:\n" 20 40 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_status ;;
+            2) action_logs ;;
+            3) action_health_check ;;
+            *) break ;;
+        esac
+    done
+}
+
+submenu_config() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=40
+    local items=(
+        "1" "$(printf "%-${W}s" "Edit config files")"
+        "2" "$(printf "%-${W}s" "Edit environment defaults")"
+        "3" "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
+        "4" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
+    )
+
+    while true; do
+        dialog --colors --no-shadow \
+            --title " Configuration " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nConfiguration Actions:\n" 20 50 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_edit_config ;;
+            2) action_edit_env ;;
+            3) action_edit_events ;;
+            4) action_edit_module_event_files ;;
+            *) break ;;
+        esac
+    done
+}
+
+submenu_audio() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=60
+    local items=(
+        "1" "$(printf "%-${W}s" "Alsa Mixer")"
+        "2" "$(printf "%-${W}s" "Audio Calibration Tool")"
+        "3" "$(printf "%-${W}s" "Level Detector Calibration")"
+    )
+
+    while true; do
+        dialog --colors --no-shadow \
+            --title " Audio Tools " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nAudio Actions:\n" 20 50 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_alsamixer ;;
+            2) action_devcal_sections ;;
+            3) action_siglevdetcal ;;
+            *) break ;;
+        esac
+    done
+}
+
+submenu_voices() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=40
+    local items=(
+        "1" "$(printf "%-${W}s" "Switch Voices")"
+    )
+
+    while true; do
+        dialog --colors --no-shadow \
+            --title " Voice Management " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nVoice Actions:\n" 20 40 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_list_voices ;;
+            *) break ;;
+        esac
+    done
+}
+
+submenu_maintenance() {
+    local status_title sysinfo
+    status_title=$(build_status_title)
+    sysinfo=$(build_sysinfo)
+    local W=40
+    local items=(
+        "1" "$(printf "%-${W}s" "Check log rotation")"
+    )
+
+    while true; do
+        dialog --colors --no-shadow \
+            --title " Maintenance " \
+            --backtitle "$status_title | $sysinfo" \
+            --cancel-label "Back" \
+            --menu "\nMaintenance Actions:\n" 20 40 10 \
+            "${items[@]}" 2>"$DIALOG_OUT" || break
+
+        local choice=$(cat "$DIALOG_OUT")
+        case "$choice" in
+            1) action_check_logrotate ;;
+            *) break ;;
+        esac
+    done
+}
+
+# =============================================================================
+# Main Menu (Refactored)
+# =============================================================================
 main_menu() {
     local status_title sysinfo
     status_title=$(build_status_title)
     sysinfo=$(build_sysinfo)
 
-    local W=30
+    local W=40
     local menu_items=(
-        "1"  "$(printf "%-${W}s" "Start service")"
-        "2"  "$(printf "%-${W}s" "Stop service")"
-        "3"  "$(printf "%-${W}s" "Restart service")"
-        "-"  "$(printf "%-${W}s" "---------- DTMF Control-------------")"
-        "4"  "$(printf "%-${W}s" "Send a DTMF Command")"
-        "-"  "$(printf "%-${W}s" "---------- Monitoring --------------")"
-        "5"  "$(printf "%-${W}s" "Show detailed status")"
-        "6"  "$(printf "%-${W}s" "Follow live logs")"
-        "7"  "$(printf "%-${W}s" "System health check")"
-        "-"  "$(printf "%-${W}s" "----------- Configuration ------------")"
-        "8"  "$(printf "%-${W}s" "Edit config files")"
-        "9"  "$(printf "%-${W}s" "Edit environment defaults")"
-        "10" "$(printf "%-${W}s" "Edit main event scripts (.tcl)")"
-        "11" "$(printf "%-${W}s" "Edit modules event scripts (.tcl)")"
-        "-"  "$(printf "%-${W}s" "----------- Audio --------------------")"
-        "12" "$(printf "%-${W}s" "Alsa Mixer")"
-        "13" "$(printf "%-${W}s" "Audio Calibration Tool")"
-        "14" "$(printf "%-${W}s" "Signal Level Detector Calibration")"
-        "-"  "$(printf "%-${W}s" "------------ Voices ------------------")"
-        "15" "$(printf "%-${W}s" "Switch Voices")"
-        "-"  "$(printf "%-${W}s" "------------- Maintenance ------------")"
-        "16" "$(printf "%-${W}s" "Check log rotation")"
-        "-"  "$(printf "%-${W}s" "------------- Boot -------------------")"
-        "17" "$(printf "%-${W}s" "Enable service at boot")"
-        "18" "$(printf "%-${W}s" "Disable service at boot")"
-        "19" "$(printf "%-${W}s" "Reboot Computer")"
+        "1" "$(printf "%-${W}s" "Service Control")"
+        "2" "$(printf "%-${W}s" "DTMF Control")"
+        "3" "$(printf "%-${W}s" "Monitoring")"
+        "4" "$(printf "%-${W}s" "Configuration")"
+        "5" "$(printf "%-${W}s" "Audio Tools")"
+        "6" "$(printf "%-${W}s" "Voice Management")"
+        "7" "$(printf "%-${W}s" "Maintenance")"
+        "8" "$(printf "%-${W}s" "Reboot Computer")"
     )
 
     if [[ "$DIALOG" == "dialog" ]]; then
@@ -1657,7 +1924,7 @@ main_menu() {
             --title " $SCRIPT_NAME v$VERSION " \
             --backtitle "$status_title | $sysinfo" \
             --cancel-label "Quit" \
-            --menu "\nChoose an action:\n" 35 50 28 \
+            --menu "\nSelect a category:\n" 25 45 10 \
             "${menu_items[@]}" 2>"$DIALOG_OUT"
     fi
 }
@@ -1670,28 +1937,17 @@ while true; do
 
     choice=$(cat "$DIALOG_OUT")
     case "$choice" in
-        1)  action_start ;;
-        2)  action_stop ;;
-        3)  action_restart ;;
-        4)  action_dtmf_control ;;
-        5)  action_status ;;
-        6)  action_logs ;;
-        7)  action_health_check ;;
-        8)  action_edit_config ;;
-        9)  action_edit_env ;;
-        10) action_edit_events ;;
-        11) action_edit_module_event_files ;;
-        12) action_alsamixer ;;
-        13) action_devcal_sections ;;
-        14) action_siglevdetcal ;;
-        15) action_list_voices ;;
-        16) action_check_logrotate ;;
-        17) action_enable ;;
-        18) action_disable ;;
-        19) action_reboot ;;
-         *)  ;; # separator selected, ignore
+        0)  exit 0 ;; # Quit
+        1)  submenu_service ;;
+        2)  submenu_dtmf ;;
+        3)  submenu_monitoring ;;
+        4)  submenu_config ;;
+        5)  submenu_audio ;;
+        6)  submenu_voices ;;
+        7)  submenu_maintenance ;;
+        8)  action_reboot ;;
+        *)  ;; # Ignore invalid
     esac
 done
-
 clear
 echo "Goodbye!"
