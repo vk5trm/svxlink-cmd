@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="2.9.1"
+readonly VERSION="3.0.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Dependency check ---
@@ -1692,6 +1692,22 @@ action_dtmf_control() {
     fi
 }
 
+action_update() {
+    # Fetch the file from GitHub
+    if ! sudo curl -sL "https://raw.githubusercontent.com/vk5trm/svxlink-cmd/master/svx" -o /usr/local/bin/svx; then
+        show_result "Update" "Could not download the update\n\nCheck network connectivity."
+        return
+    fi
+
+    # Set executable permissions
+    if ! sudo chmod +x /usr/local/bin/svx; then
+        show_result "Update" "Could not set permissions."
+        return
+    fi
+
+    show_result "Update" "Update installed.\n\nIt will take effect next time you start svx."
+}
+
 action_reboot() {
     clear
     echo "=== Restarting Computer ==="
@@ -1881,6 +1897,7 @@ submenu_maintenance() {
     local W=40
     local items=(
         "1" "$(printf "%-${W}s" "Check log rotation")"
+        "2" "$(printf "%-${W}s" "Update SVXLink Cmd")" 
     )
 
     while true; do
@@ -1894,6 +1911,7 @@ submenu_maintenance() {
         local choice=$(cat "$DIALOG_OUT")
         case "$choice" in
             1) action_check_logrotate ;;
+            2) action_update ;; 
             *) break ;;
         esac
     done

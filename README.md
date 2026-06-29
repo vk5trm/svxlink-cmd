@@ -71,7 +71,7 @@ This will launch the interactive admin menu. Navigate using arrow keys and selec
 
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -90,7 +90,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
 ### Service Control Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -107,7 +107,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
 ### DTMF Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -124,7 +124,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
 ### Monitoring Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -141,7 +141,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
 ### Configuration Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -193,7 +193,7 @@ and the closing lines from the at the bottom of the file
 ### Audio Tools Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -241,7 +241,7 @@ NOTE: SSB receivers should tune to carrier frequency - 1 kHz.
 ### Voice Management Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
@@ -259,12 +259,12 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
 ### Maintaince Menu Overview
 ```
 SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
-        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        ┌──────────── Svx Admin v3.0.0  ────────────┐
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
-        │ │  1   Check Log Rotation               │ │       Checks if Log rotation is set up on your system.
-        │ │                                       │ │        If not it sets it up for you.
+        │ │  1   Check Log Rotation               │ │       Checks if Log rotation if not there sets it up on your system.
+        │ │  2   Update SVXLink Cmd               │ │       Updates SVXLink Cmd from GITHub repository.
         │ │                                       │ │      
         │ │                                       │ │      
         │ │                                       │ │     
