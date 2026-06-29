@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="3.0.0"
+readonly VERSION="3.1.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Dependency check ---
@@ -37,6 +37,7 @@ fi
 
 # --- Temp file for dialog output ---
 DIALOG_OUT=$(mktemp)
+trap 'rm -f "$DIALOG_OUT"' EXIT
 
 # --- Custom dialog theme (dark, no blue) ---
 DIALOGRC_FILE=$(mktemp)
@@ -655,10 +656,6 @@ action_edit_events() {
 # Edit Config added by VK5TRM
 # =============================================================================
 action_edit_config() {
-    # Ensure we have a temp file for dialog output
-    DIALOG_OUT=$(mktemp)
-    trap "rm -f '$DIALOG_OUT'" EXIT
-
     # 1. Resolve Config Directory
     # We call the function directly and check its exit status
     if ! resolve_config_from_env; then
@@ -864,12 +861,7 @@ action_edit_module_event_files() {
             dialog_cmd+=("${menu_items[$i]}" "${menu_items[$((i+1))]}")
         done
         
-        local DIALOG_OUT
-        DIALOG_OUT=$(mktemp)
-        trap 'rm -f "$DIALOG_OUT"' EXIT
-
         if ! "${dialog_cmd[@]}" 2>"$DIALOG_OUT"; then
-            rm -f "$DIALOG_OUT"
             return
         fi
 
@@ -977,10 +969,6 @@ action_list_voices() {
     done
 
     # 7. Execute Directory Selection Menu
-    local DIALOG_OUT
-    DIALOG_OUT=$(mktemp)
-    trap 'rm -f "$DIALOG_OUT"' EXIT
-
     local selected_dir=""
     if [[ "$DIALOG" == "dialog" ]]; then
         # Use array construction for safety
@@ -1138,76 +1126,143 @@ action_switch_voice() {
         fi
     fi
 }
-
+# =============================================================================
+# FUNCTION: Alsamixer
+# =============================================================================
 action_alsamixer() {
     local usb_card=""
+    
+    # 1. Identify USB Audio Card if present
     if [[ -f /proc/asound/cards ]]; then
         usb_card=$(awk '/USB-Audio/{print $1; exit}' /proc/asound/cards)
     fi
+
+    # 2. Launch Alsamixer
     if [[ -n "$usb_card" ]]; then
-        alsamixer -c "$usb_card" || true
+        if ! alsamixer -c "$usb_card"; then
+            show_result "Error" "Failed to launch Alsamixer for card '$usb_card'.\n\nCheck if the device is connected."
+            return 1
+        fi
     else
-        alsamixer || true
+        if ! alsamixer; then
+            show_result "Error" "Failed to launch Alsamixer.\n\nNo default sound card detected."
+            return 1
+        fi
     fi
+
+    # 3. Save Settings
     if ! command -v alsactl &>/dev/null; then
-    show_result "Alsa Mixer" "No Alsa Control Found"
-    return 1
+        show_result "Warning" "Alsamixer settings changed, but 'alsactl' is missing.\nSettings might be lost on reboot."
     else
-    sudo alsactl store
-    show_result "Alsa Mixer" "Your Alsamixer settings have been saved"
-fi
+        if sudo alsactl store; then
+            show_result "Success" "Alsamixer settings have been saved."
+        else
+            show_result "Error" "Failed to save settings with alsactl."
+        fi
+    fi
 }
 
+# =============================================================================
+# UPDATED FUNCTION: Log Rotation Check (Dynamic Paths + Conditional Postrotate)
+# =============================================================================
 readonly LOGROTATE_CONF="/etc/logrotate.d/svxlink-server"
-readonly LOGROTATE_CONTENT='
-/var/log/svxlink
-/var/log/remotetrx
-/var/log/svxreflector
-{
-    daily
-    rotate 7
-    compress
-    missingok
-    notifempty
-    create 0644 svxlink adm
-    postrotate
-        killall -HUP svxlink
-    endscript
-}'
-
 action_check_logrotate() {
-    local has_logs=false
+    local -a active_logs=()
+    local -a services_with_logs=()
+    local svc logfile
+
+    # 1. Resolve actual log paths and track WHICH services have them
     for svc in "${SERVICES[@]}"; do
-        [[ -f "${LOG_FILES[$svc]}" ]] && has_logs=true && break
+        logfile=$(resolve_logfile "$svc")
+        
+        # Only process if path is found AND file exists
+        if [[ -n "$logfile" && -f "$logfile" ]]; then
+            active_logs+=("$logfile")
+            services_with_logs+=("$svc")
+        fi
     done
 
-    if [[ "$has_logs" == false ]]; then
-        show_result "No File Logs" "No SvxLink file-based logs found.\n\nServices are logging to journald only.\nNo log rotation needed."
+    # 2. Check if any file-based logs were found
+    if [[ ${#active_logs[@]} -eq 0 ]]; then
+        show_result "No File Logs" "No SvxLink file-based logs found.\n\nServices are likely logging to journald only.\nNo log rotation configuration is needed."
         return
     fi
 
+    # 3. Check if logrotate is installed
     if ! command -v logrotate &>/dev/null; then
-        show_result "Warning" "SvxLink is writing to log files but\nlogrotate is not installed.\n\nInstall it with:\n  apt install logrotate\n\nThen run this check again."
+        show_result "Warning" "SvxLink is writing to log files but\nlogrotate is not installed.\n\nInstall it with:\n  sudo apt install logrotate"
         return
     fi
 
+    # 4. Build the postrotate script dynamically
+    # Only include checks for services that actually have log files
+    local postrotate_body=""
+    local first=true
+
+    for svc in "${services_with_logs[@]}"; do
+        if [[ "$first" == true ]]; then
+            first=false
+        else
+            postrotate_body+="\n"
+        fi
+        
+        # Add logic: If active -> send HUP
+        # Using \n for newlines in the final echo -e
+        postrotate_body+="        # Signal ${SERVICE_LABELS[$svc]} if active\n"
+        postrotate_body+="        if systemctl is-active --quiet ${svc}.service 2>/dev/null; then\n"
+        postrotate_body+="            killall -HUP ${svc} 2>/dev/null || true\n"
+        postrotate_body+="        fi"
+    done
+
+    local files_list="${active_logs[*]}"
+    
+    # Construct the full config content
+    local config_content="${files_list}\n{\n    daily\n    rotate 7\n    compress\n    missingok\n    notifempty\n    create 0644 svxlink adm\n    postrotate\n${postrotate_body}\n    endscript\n}"
+
+    # 5. Check if config already exists
     if [[ -f "$LOGROTATE_CONF" ]]; then
-        local content
-        content=$(<"$LOGROTATE_CONF")
-        show_result "Log Rotation OK" "Config: ${LOGROTATE_CONF}\n\n${content}"
+        local current_content
+        current_content=$(<"$LOGROTATE_CONF")
+        
+        dialog --colors --no-shadow --title " Log Rotation Config Exists " \
+            --yesno "Current config found at:\n${LOGROTATE_CONF}\n\n--- Current Content ---\n$current_content\n\n--- Proposed New Content ---\n${config_content}\n\nDo you want to overwrite with the dynamically derived paths?" \
+            22 70 2>"$DIALOG_OUT"
+        
+        if [[ $? -ne 0 ]]; then
+            show_result "Cancelled" "No changes made."
+            return
+        fi
     else
+        # Confirm creation
         if [[ "$DIALOG" == "dialog" ]]; then
-            dialog --colors --no-shadow --title " Log Rotation Missing " \
-                --yesno "\nSvxLink is writing to log files but no\nlogrotate config was found.\n\nCreate ${LOGROTATE_CONF}?\n\nDaily rotation, 7 copies, compressed.\n" 15 55 2>"$DIALOG_OUT"
+            dialog --colors --no-shadow --title " Create Log Rotation " \
+                --yesno "No logrotate config found.\n\nSvxLink is writing to:\n${files_list}\n\nCreate config with these paths?\n\nProposed Content:\n${config_content}" \
+                24 70 2>"$DIALOG_OUT"
+            
+            if [[ $? -ne 0 ]]; then
+                show_result "Cancelled" "No changes made."
+                return
+            fi
         fi
-        if [[ $? -eq 0 ]]; then
-            sudo sh -c "cat > '$LOGROTATE_CONF' << 'EOF'
-            $LOGROTATE_CONTENT"
-            sudo rm /etc/logrotate.d/svxreflector"
-            sudo rm /etc/logrotate.d/remotetrx"
-            sudo chmod 644 "$LOGROTATE_CONF"
-            show_result "Success" "Created ${LOGROTATE_CONF}\n\nLog rotation is now active."
-        fi
+    fi
+
+    # 6. Write the new config
+    local tmp_file
+    tmp_file=$(mktemp)
+
+    # Write content to temp file
+    echo -e "$config_content" > "$tmp_file"
+
+    if sudo mv "$tmp_file" "$LOGROTATE_CONF"; then
+        sudo chmod 644 "$LOGROTATE_CONF"
+        
+        # Clean up old specific configs if they exist (to avoid duplicates)
+        sudo rm -f /etc/logrotate.d/svxreflector /etc/logrotate.d/remotetrx /etc/logrotate.d/svxlink 2>/dev/null
+
+        show_result "Success" "Log rotation configured successfully!\n\nFile: ${LOGROTATE_CONF}\n\nLogs included:\n${files_list}"
+    else
+        show_result "Error" "Failed to write logrotate config.\n\nCheck permissions."
+        rm -f "$tmp_file"
     fi
 }
 
