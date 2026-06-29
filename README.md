@@ -94,11 +94,11 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
-        │ │  1   Start a Service                  │ │       Select a service to start - Choose one managed services
-        │ │  2   Stop a Service                   │ │       Select a service to Stop - Choose one managed services 
-        │ │  3   Restart a Service                │ │       Select a service to Restart - Choose one managed services 
-        │ │  4   Enable a Sevice at Boot          │ │       Select a service to Enable at boot - Choose one managed services
-        │ │  5   Disable a Sevice at Boot         │ │       Select a service to Disable at boot  - Choose one managed services
+        │ │  1   Start a Service                  │ │       Select a service to start - Choose one of the managed services
+        │ │  2   Stop a Service                   │ │       Select a service to Stop - Choose one of the managed services 
+        │ │  3   Restart a Service                │ │       Select a service to Restart - Choose one of the managed services 
+        │ │  4   Enable a Sevice at Boot          │ │       Select a service to Enable at boot - Choose one of the managed services
+        │ │  5   Disable a Sevice at Boot         │ │       Select a service to Disable at boot  - Choose one of the managed services
         │ │                                       │ │
         │ └───────────────────────────────────────┘ │
         │          <OK>          <Quit>             │
@@ -128,8 +128,8 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │                                           │
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
-        │ │  1   Show Detail Status               │ │       Shows detailed status of a service - Choose one managed services
-        │ │  2   Follow Live Logs                 │ │       Follow live logs - Choose one managed services 
+        │ │  1   Show Detail Status               │ │       Shows detailed status of a service - Choose one of the managed services
+        │ │  2   Follow Live Logs                 │ │       Follow live logs - Choose one of the managed services 
         │ │  3   System Health Check              │ │       Gives you disk space memory space and top 10 processes 
         │ │                                       │ │      
         │ │                                       │ │      
@@ -146,8 +146,8 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
         │ │  1   Edit config Files                │ │       Edit the main confguration files - See below
-        │ │  2   Edit the Enviroment default      │ │       Edit the Enviroment default files - Choose one managed services - See below
-        │ │  3   Edit the main Event scripts      │ │       Edit the main Event Script files - Choose one managed services - See below
+        │ │  2   Edit the Enviroment default      │ │       Edit the Enviroment default files - Choose one of the managed services
+        │ │  3   Edit the main Event scripts      │ │       Edit the main Event Script files - See below
         │ │  4   Edit Module Event files          │ │       Edit the Module Event files - See below
         │ │                                       │ │      
         │ │                                       │ │
@@ -200,8 +200,8 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │ │  1   Alsa Mixer                       │ │       Start AlsaMixer to adjust audio levels - Auto saves on exit
         │ │  2   Audio Calibration tool           │ │       Start Audio Calibration tool - See below 
         │ │  3   Level Detector Calibration       │ │       Start Level Detector Calibration tool for adjusting CTCSS detection
-        │ │                                       │ │        After the level detector calibration has finished
-        │ │                                       │ │        put these values from the calibration into your svxlink.conf file         
+        │ │                                       │ │        After the level detector calibration has finished put these values
+        │ │                                       │ │        from the calibration into your RX section of your svxlink.conf file         
         │ │                                       │ │                   SIGLEV_SLOPE= [value]  
         │ └───────────────────────────────────────┘ │                   SIGLEV_OFFSET= [value]
         │          <OK>          <Quit>             │                   CTCSS_SNR_OFFSETS= [value]
@@ -264,7 +264,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
         │ │  1   Check Log Rotation               │ │       Checks if Log rotation if not there sets it up on your system.
-        │ │  2   Update SVXLink Cmd               │ │       Updates SVXLink Cmd from GITHub the repository.
+        │ │  2   Update SVXLink Cmd               │ │       Updates SVXLink Cmd from this GITHub repository.
         │ │                                       │ │      
         │ │                                       │ │      
         │ │                                       │ │     
