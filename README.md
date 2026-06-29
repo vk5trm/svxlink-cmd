@@ -81,7 +81,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │ │  4   Configuration                    │ │       Configuration Menu to edit config,environment and TCL event files.  
         │ │  5   Audio Tools                      │ │       Audio Tools Menu to Adjust audio levels and perform audio calibration.
         │ │  6   Voice Management                 │ │       Voice Menu Change to other voice files.
-        │ │  7   Maintaince                       │ │       Maintaince Menu to check and enable log rotation.
+        │ │  7   Maintaince                       │ │       Maintaince Menu to check and enable log rotation and update this script
         | |  8   Reboot Computer                  | |       Reboot Computer.
         │ └───────────────────────────────────────┘ │
         │          <OK>          <Quit>             │
@@ -264,7 +264,7 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
         │ │  1   Check Log Rotation               │ │       Checks if Log rotation if not there sets it up on your system.
-        │ │  2   Update SVXLink Cmd               │ │       Updates SVXLink Cmd from GITHub repository.
+        │ │  2   Update SVXLink Cmd               │ │       Updates SVXLink Cmd from GITHub the repository.
         │ │                                       │ │      
         │ │                                       │ │      
         │ │                                       │ │     
