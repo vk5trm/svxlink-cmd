@@ -146,8 +146,8 @@ SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
         │  Choose an Category:                      │
         │ ┌───────────────────────────────────────┐ │
         │ │  1   Edit config Files                │ │       Edit the main confguration files - See below
-        │ │  2   Edit the Enviroment default      │ │       Edit the Enviroment default files - Choose one of the managed services - See below
-        │ │  3   Edit the main Event scripts      │ │       Edit the main Event Script files - Choose one of the managed services - See below
+        │ │  2   Edit the Enviroment default      │ │       Edit the Enviroment default files - Choose one of the managed services
+        │ │  3   Edit the main Event scripts      │ │       Edit the main Event Script files - See below
         │ │  4   Edit Module Event files          │ │       Edit the Module Event files - See below
         │ │                                       │ │      
         │ │                                       │ │
