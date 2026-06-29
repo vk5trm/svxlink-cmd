@@ -67,44 +67,95 @@ svx
 
 This will launch the interactive admin menu. Navigate using arrow keys and select options with Enter.
 
-### Menu Overview
+### Main Menu Overview
 
 ```
-○ SvxLink  ○ RemoteTRX  ○ SvxReflector | 48°C  Up 3d 2h  Since 2026-03-28 14:30
-┌──────────── Svx Admin v2.9.0  ────────────┐
-│                                           │
-│  Choose an action:                        │
-│ ┌───────────────────────────────────────┐ │
-│ │  1  Start service                     │ │
-│ │  2  Stop service                      │ │
-│ │  3  Restart service                   │ │
-│ │  ─  ─── DTMF Control────────          │ │ 
-│ │  4  Send DTMF Command                 │ │
-│ │  ─  ─── Monitoring ─────────          │ │
-│ │  5  Show detailed status              │ │
-│ │  6  Follow live logs                  │ │
-│ │  7  System health check               │ │
-│ │  ─  ─── Configuration ──────          │ │
-│ │  8  Edit config file                  │ │
-│ │  9  Edit environment defaults         │ │
-│ │ 10  Edit main event scripts (.tcl)    │ │
-| | 11  Edit modules event scripts (.tcl) | |
-│ │  ─  ─── Audio ──────────────          │ │
-│ │ 12  Alsamixer                         │ │
-│ │ 13  Audio Calibration tool            │ │
-│ │ 14  Signal Level Detector Calibration │ │
-| |  ─  ─── Voices ─────────────          | │
-| | 15  Switch Voices                     | |
-│ │  ─  ─── Maintenance ────────          │ │
-│ │ 16  Check log rotation                │ │
-│ │  ─  ────── Boot  ───────────          │ │
-│ │ 17  Enable service at boot            │ │
-│ │ 18  Disable service at boot           │ │
-| | 19  Reboot Computer                   | | 
-│ └───────────────────────────────────────┘ │
-│          <OK>          <Quit>             │
-└───────────────────────────────────────────┘
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Service Control                  │ │       Service Menu to START,STOP,RESTART and ENABLE or DISABLE a service.
+        │ │  2   DTMF Control                     │ │       DTMF Menu to Send DTMF commands to your node.
+        │ │  3   Monitoring                       │ │       Monitoring Menu to view system health, service status and service Logs.
+        │ │  4   Configuration                    │ │       Configuration Menu to edit config,environment and TCL event files.  
+        │ │  5   Audio Tools                      │ │       Audio Tools Menu to Adjust audio levels and perform audio calibration.
+        │ │  6   Voice Management                 │ │       Voice Menu Change to other voice files.
+        │ │  7   Maintaince                       │ │       Maintaince Menu to check and enable log rotation.
+        | |  8   Reboot Computer                  | |       Reboot Computer.
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
 ```
+### Service Control Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Start a Service                  │ │       Select a service to start - Choose one managed services
+        │ │  2   Stop a Service                   │ │       Select a service to Stop - Choose one managed services 
+        │ │  3   Restart a Service                │ │       Select a service to Restart - Choose one managed services 
+        │ │  4   Enable a Sevice at Boot          │ │       Select a service to Enable at boot - Choose one managed services
+        │ │  5   Disable a Sevice at Boot         │ │       Select a service to Disable at boot  - Choose one managed services
+        │ │                                       │ │
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
+```
+### DTMF Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Send DTMF Command                │ │       Send a DTMF command to your node via keyboard 
+        │ │                                       │ │       - Command format can be either a full command or a macro command 
+        │ │                                       │ │       - Does not need the # at the end of the command 
+        │ │                                       │ │      
+        │ │                                       │ │      
+        │ │                                       │ │
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
+```
+### Monitoring Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Show Detail Status               │ │       Shows detailed status of a service - Choose one managed services
+        │ │  2   Follow Live Logs                 │ │       Follow live logs - Choose one managed services 
+        │ │  3   System Health Check              │ │       Gives you disk space memory space and top 10 processes 
+        │ │                                       │ │      
+        │ │                                       │ │      
+        │ │                                       │ │
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
+```
+### Configuration Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Edit config Files                │ │       Edit the main confguration files - See below
+        │ │  2   Edit the Enviroment default      │ │       Edit the Enviroment default files - Choose one managed services - See below
+        │ │  3   Edit the main Event scripts      │ │       Edit the main Event Script files - Choose one managed services - See below
+        │ │  4   Edit Module Event files          │ │       Edit the Module Event files - See below
+        │ │                                       │ │      
+        │ │                                       │ │
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
+```
+
 
 ## Configuration
 
@@ -139,8 +190,89 @@ and the closing lines from the at the bottom of the file
 ```
 ***WARNING*** It is very easy to make mistakes and have weird things happen and/or get lots of errors in the log. To undo an edited eventscript TCL file go to the /usr/share/svxlink/events.d/local directory and delete the relevent TCL file. This will return you to the default config 
 
-The "Switch Voices Menu" lets you change voices on your system. It can handle either a normal directory with voice files, A single GIT repository with one set of voice files or a voice repository with multiple voices like my [Australian voices](https://github.com/vk5trm/en_AU-VK5TRM) repository.
+### Audio Tools Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Alsa Mixer                       │ │       Start AlsaMixer to adjust audio levels - Auto saves on exit
+        │ │  2   Audio Calibration tool           │ │       Start Audio Calibration tool - See below 
+        │ │  3   Level Detector Calibration       │ │       Start Level Detector Calibration tool for adjusting CTCSS detection
+        │ │                                       │ │        After the level detector calibration has finished
+        │ │                                       │ │        put these values from the calibration into your svxlink.conf file         
+        │ │                                       │ │                   SIGLEV_SLOPE= [value]  
+        │ └───────────────────────────────────────┘ │                   SIGLEV_OFFSET= [value]
+        │          <OK>          <Quit>             │                   CTCSS_SNR_OFFSETS= [value]
+        └───────────────────────────────────────────┘
+```
+### Audio Calibration tool
 
+#### Receiver Calibration (-r flag):
+
+1. Set RF signal generator to your frequency with:
+   - 1000 Hz tone
+   - 2400 Hz deviation
+2. Adjust level using Alsamixer for coarse adjustment.
+3. Use + or - in devcal for fine adjustment.
+4. Adjust until the tone dev at bottom left reads 2400.
+5. Record PREAMP= dB value into svxlink.conf RX section.
+
+NOTE: -12 dBFS corresponds to 2404 Hz deviation.
+
+#### Transmitter Calibration (-t flag):
+
+1. Hit 'T' on keyboard to transmit.
+2. Use a deviation meter OR Bessel 0 Null method.
+3. Turn off all TX CTCSS tones.
+4. Start with audio output in Alsamixer MUTED.
+5. Test TX modulation:
+   - 5a: Spectrum analyzer (zoomed on carrier amplitude) OR
+   - 5b: SSB receiver in CW mode (tune to carrier).
+6. Unmute Alsamixer output.
+7. devcal applies a 1000 Hz tone.
+8. Adjust modulation until carrier is minimized (Bessel null).
+9. Use Alsamixer (coarse) then + or - in devcal (fine).
+10. Record MASTER_GAIN= dB value into svxlink.conf TX section.
+
+NOTE: SSB receivers should tune to carrier frequency - 1 kHz.
+
+### Voice Management Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Switch Voices                    │ │       The "Switch Voices Menu" lets you change voices on your system.
+        │ │                                       │ │        It can handle either a normal directory with voice files,
+        │ │                                       │ │        a single GIT repository with one set of voice files
+        │ │                                       │ │        or a voice repository with multiple voices like my
+        │ │                                       │ │        Australian voices repository. See link at bottom of page. 
+        │ │                                       │ │
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
+```
+
+### Maintaince Menu Overview
+```
+SvxLink (3h 30m) RemoteTRX (Down)  SvxReflector (Down) | Temp: 48°C  Up 3d 2h
+        ┌──────────── Svx Admin v2.9.0  ────────────┐
+        │                                           │
+        │  Choose an Category:                      │
+        │ ┌───────────────────────────────────────┐ │
+        │ │  1   Check Log Rotation               │ │       Checks if Log rotation is set up on your system.
+        │ │                                       │ │        If not it sets it up for you.
+        │ │                                       │ │      
+        │ │                                       │ │      
+        │ │                                       │ │     
+        │ │                                       │ │
+        │ └───────────────────────────────────────┘ │
+        │          <OK>          <Quit>             │
+        └───────────────────────────────────────────┘
+```
 ## Troubleshooting
 
 ### "dialog: command not found"
@@ -194,3 +326,4 @@ GPL-3.0 — See LICENSE file for details
 **Related Projects:**
 - [SvxLink](https://github.com/sm0svx/svxlink) — Main SvxLink project
 - [Original svxlink-cmd](https://github.com/audric/svxlink-cmd) — Original repository
+- [VK5TRM Australian voices](https://github.com/vk5trm/en_AU-VK5TRM) — Voice repository.
