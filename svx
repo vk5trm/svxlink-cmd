@@ -473,6 +473,7 @@ action_edit_env() {
 # NEW FUNCTION: Edit Event Script Actions added by VK5TRM
 # =============================================================================
 action_edit_events() {
+    temp_file=""
     # 1. Resolve Config
     if ! resolve_config_from_env; then
         dialog --title "Config Error" --msgbox "Failed to resolve config." 12 60
