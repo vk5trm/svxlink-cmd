@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # --- Constants ---
-readonly VERSION="3.1.0"
+readonly VERSION="3.2.0"
 readonly SCRIPT_NAME="Svx Admin"
 
 # --- Dependency check ---
@@ -507,15 +507,28 @@ action_edit_events() {
     # 3. Determine the actual Event Directory
     local EVENTS_DIR="$RESOLVED_EVENT_HANDLER_DIR"
     
-    # Check if 'events.d' is a subdirectory (common pattern)
-    if [[ -d "$EVENTS_DIR/events.d" ]]; then
-        EVENTS_DIR="$EVENTS_DIR/events.d"
-    elif [[ ! -d "$EVENTS_DIR" ]]; then
-        dialog --title "Directory Missing" \
-               --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$RESOLVED_EVENT_HANDLER_DIR" \
-               12 60
-        return 1
-    fi
+     # Check if the base directory exists first
+    if [[ ! -d "$EVENTS_DIR" ]]; then
+           dialog --title "Directory Missing" \
+           --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$RESOLVED_EVENT_HANDLER_DIR" \
+           12 60
+           return 1
+           fi
+
+     # Base directory exists, now check for the subdirectory
+     if [[ -d "$EVENTS_DIR/events.d" ]]; then
+           EVENTS_DIR="$EVENTS_DIR/events.d"
+     else
+           dialog --title "Directory Missing" \
+           --msgbox "Required 'modules.d' directory not found inside:\n$EVENTS_DIR\n\nPlease create it or move your files there." \
+           12 60
+           return 1
+           fi
+     # Verify the final target directory exists
+     if [[ ! -d "$EVENTS_DIR" ]]; then
+           show_result "Error" "Module events directory not found:\n${EVENTS_DIR}"
+           return
+           fi
 
     # 4. Proceed with file listing (Standard logic)
     if ! ls "$EVENTS_DIR"/*.tcl >/dev/null 2>&1; then
@@ -609,19 +622,51 @@ action_edit_events() {
     original_filename=$(basename "$selected_file")
 
     local temp_file
-    temp_file=$(sudo mktemp "/run/${original_filename}.XXXXXX") || {
-        show_result "Error" "Failed to create temporary file"
-        return
+    temp_file=$(mktemp)
+
+if [[ "$selected_file" == "$EVENTS_DIR/local"/* ]]; then
+        cp "$selected_file" "$temp_file"
+    else
+# 1. Find the line number containing "End of namespace" (case insensitive)
+MARKER_LINE=$(grep -i "End of namespace" -n "$selected_file" | head -n 1 | cut -d: -f1)
+
+if [ -z "$MARKER_LINE" ]; then
+    echo "Warning: 'End of namespace' not found. Commenting everything except 'namespace' lines."
+    # Fallback to simple awk if marker is not found
+    awk '
+    /namespace/ { print; next }
+    { print "#" $0 }
+    ' "$selected_file" > "$temp_file"
+else
+    echo "Found marker at line: $MARKER_LINE"
+    TARGET_LINE=$((MARKER_LINE + 1))
+    
+    # 2. Use awk to process the file with the known marker line number
+    awk -v marker="$MARKER_LINE" -v target="$TARGET_LINE" '
+    {
+        # Check for namespace
+        if (tolower($0) ~ /namespace/) {
+            print $0
+            next
+        }
+
+        # If this is the line AFTER the marker, keep it
+        if (NR == target) {
+            print $0
+            next
+        }
+
+        # Default: Comment the line
+        print "#" $0
     }
+    ' "$selected_file" > "$temp_file"
+   fi
+fi
 
-    trap 'sudo rm -f "$temp_file"' RETURN
 
-    if ! sudo cp -p "$selected_file" "$temp_file"; then
-        show_result "Error" "Failed to prepare temporary file"
-        return
-    fi
+    trap 'rm -f "$temp_file"' RETURN
 
-    sudo "$EDITOR" "$temp_file"
+    "$EDITOR" "$temp_file"
 
     if cmp -s "$selected_file" "$temp_file"; then
         show_result "No Changes" "File was not modified."
@@ -630,7 +675,7 @@ action_edit_events() {
 
     local save_name
     if [[ "$DIALOG" == "dialog" ]]; then
-        save_name=$(dialog --stdout --title " Save Event Script " --inputbox "\nSave as filename:" 10 60 "$original_filename")
+        save_name=$(dialog --stdout --title " Do you want to SAVE the Event Script " --inputbox "\nSave as filename:" 10 60 "$original_filename")
     fi
 
     [[ $? -eq 0 ]] || return
@@ -800,94 +845,191 @@ action_edit_module_event_files() {
     local EVENTS_DIR="$RESOLVED_EVENT_HANDLER_DIR"
     local MODULES_EVENTS_DIR=""
 
-    # Check if 'modules.d' is a subdirectory
-    if [[ -d "$EVENTS_DIR/modules.d" ]]; then
-        MODULES_EVENTS_DIR="$EVENTS_DIR/modules.d"
-    else
-        # Fallback: If modules.d doesn't exist, check if the base dir itself contains the files
-        # OR fail if the base dir doesn't exist either
-        if [[ ! -d "$EVENTS_DIR" ]]; then
-            dialog --title "Directory Missing" \
-                   --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$EVENTS_DIR\n\nAlso checked for 'modules.d' subfolder." \
-                   12 60
-            return 1
-        fi
-        
-        # For now, let's error out if modules.d is missing, as per your original intent
-        dialog --title "Directory Missing" \
-               --msgbox "Required 'modules.d' directory not found inside:\n$EVENTS_DIR\n\nPlease create it or move your files there." \
+    # Check if the base directory exists first
+    if [[ ! -d "$EVENTS_DIR" ]]; then
+           dialog --title "Directory Missing" \
+           --msgbox "The directory derived from EVENT_HANDLER does not exist:\n$RESOLVED_EVENT_HANDLER_DIR" \
+           12 60
+           return 1
+           fi
+
+     # Base directory exists, now check for the subdirectory
+     if [[ -d "$EVENTS_DIR/modules.d" ]]; then
+           MODULES_EVENTS_DIR="$EVENTS_DIR/modules.d"
+     else
+           dialog --title "Directory Missing" \
+           --msgbox "Required 'modules.d' directory not found inside:\n$EVENTS_DIR\n\nPlease create it or move your files there." \
+           12 60
+           return 1
+           fi
+     # Verify the final target directory exists
+     if [[ ! -d "$MODULES_EVENTS_DIR" ]]; then
+           show_result "Error" "Module events directory not found:\n${MODULES_EVENTS_DIR}"
+           return
+           fi
+
+ # 4. Proceed with file listing (Standard logic)
+    if ! ls "$MODULES_EVENTS_DIR"/*.tcl >/dev/null 2>&1; then
+        dialog --title "No Events" --msgbox "No .tcl files in $MODULES_EVENTS_DIR" 10 50
+        return 1
+    fi
+
+    #  Verify .tcl files exist
+    if ! ls "$MODULES_EVENTS_DIR"/*.tcl >/dev/null 2>&1; then
+        dialog --title "No Events Found" \
+               --msgbox "No .tcl files found in the strict path:\n$MODULES_EVENTS_DIR" \
                12 60
         return 1
     fi
 
-    # 4. Verify the final target directory exists
-    if [[ ! -d "$MODULES_EVENTS_DIR" ]]; then
-        show_result "Error" "Module events directory not found:\n${MODULES_EVENTS_DIR}"
-        return
+    #  Proceed to list/edit (Same logic as before)
+    local -a tcl_files=()
+    local -A seen_files=()
+
+    # Check for local overrides
+    if [[ -d "$MODULES_EVENTS_DIR/local" ]]; then
+        while IFS= read -r -d '' file; do
+            local base
+            base=$(basename "$file")
+            tcl_files+=("$file")
+            seen_files["$base"]=1
+        done < <(find "$MODULES_EVENTS_DIR/local" -maxdepth 1 -type f -name "*.tcl" -print0 | sort -z)
     fi
 
-    # 5. Find TCL files
-    local -a tcl_files=()
+    # Add main files
     while IFS= read -r -d '' file; do
-        tcl_files+=("$file")
-    done < <(
-        find "$MODULES_EVENTS_DIR" \
-            -maxdepth 1 \
-            -type f \
-            -name "*.tcl" \
-            -print0 | sort -z
-    )
+        local base
+        base=$(basename "$file")
+        if [[ -z "${seen_files[$base]:-}" ]]; then
+            tcl_files+=("$file")
+        fi
+    done < <(find "$MODULES_EVENTS_DIR" -maxdepth 1 -type f -name "*.tcl" -print0 | sort -z)
+
 
     if [[ ${#tcl_files[@]} -eq 0 ]]; then
         show_result "No TCL Files" "No .tcl files found in:\n${MODULES_EVENTS_DIR}"
         return
     fi
 
-    # 6. Build Menu Items
+    # Build menu items
     local -a menu_items=()
     local idx=1
     for file in "${tcl_files[@]}"; do
         local display_name
         display_name=$(basename "$file")
+        if [[ "$file" == "$MODULES_EVENTS_DIR/local"/* ]]; then
+            display_name="${display_name} (modified)"
+        fi
         menu_items+=("$idx" "$display_name")
         ((idx++))
     done
 
-    # 7. Execute Dialog
     local cmd
     if [[ "$DIALOG" == "dialog" ]]; then
-        # Use an array for safety instead of eval
-        local dialog_cmd=(dialog --colors --no-shadow --title " Select Module TCL File " --menu '\nChoose a .tcl file to edit:\n' 16 70 7)
-        for ((i=0; i<${#menu_items[@]}; i+=2)); do
-            dialog_cmd+=("${menu_items[$i]}" "${menu_items[$((i+1))]}")
-        done
-        
-        if ! "${dialog_cmd[@]}" 2>"$DIALOG_OUT"; then
+        cmd="dialog --colors --no-shadow --title ' Select Event Script ' --menu '\nChoose a .tcl file to edit:\n' 16 70 7"
+    fi
+
+    cmd="$cmd $(printf '%q ' "${menu_items[@]}") 2>'$DIALOG_OUT'"
+    eval "$cmd" || return
+
+    local choice
+    choice=$(<"$DIALOG_OUT")
+
+    if [[ -z "$choice" ]] || [[ ! "$choice" =~ ^[0-9]+$ ]]; then
+        return
+    fi
+
+    local selected_file="${tcl_files[$((choice - 1))]}"
+
+    if [[ ! -f "$selected_file" ]]; then
+        show_result "Error" "File not found:\n${selected_file}"
+        return
+    fi
+
+    if [[ ! -d "$MODULES_EVENTS_DIR/local" ]]; then
+        sudo mkdir -p "$MODULES_EVENTS_DIR/local" || {
+            show_result "Error" "Failed to create local events directory:\n${$MODULES_EVENTS_DIR/local}"
             return
-        fi
+        }
+    fi
 
-        local choice
-        choice=$(<"$DIALOG_OUT")
-        rm -f "$DIALOG_OUT"
+    local original_filename
+    original_filename=$(basename "$selected_file")
 
-        if [[ -z "$choice" ]] || ! [[ "$choice" =~ ^[0-9]+$ ]]; then
-            return
-        fi
+    local temp_file
+    temp_file=$(mktemp)
 
-        local selected_file="${tcl_files[$((choice - 1))]}"
-
-        if [[ ! -f "$selected_file" ]]; then
-            show_result "Error" "File not found:\n${selected_file}"
-            return
-        fi
-
-        # 8. Edit the file
-        # Ensure EDITOR is set
-        local editor_cmd="${EDITOR:-nano}"
-        sudo "$editor_cmd" "$selected_file"
+if [[ "$selected_file" == "$MODULES_EVENTS_DIR/local"/* ]]; then
+        cp "$selected_file" "$temp_file"
     else
-        dialog --msgbox "Error: 'dialog' utility not found." 10 50
-        return 1
+# 1. Find the line number containing "End of namespace" (case insensitive)
+MARKER_LINE=$(grep -i "End of namespace" -n "$selected_file" | head -n 1 | cut -d: -f1)
+
+if [ -z "$MARKER_LINE" ]; then
+    echo "Warning: 'End of namespace' not found. Commenting everything except 'namespace' lines."
+    # Fallback to simple awk if marker is not found
+    awk '
+    /namespace/ { print; next }
+    { print "#" $0 }
+    ' "$selected_file" > "$temp_file"
+else
+    echo "Found marker at line: $MARKER_LINE"
+    TARGET_LINE=$((MARKER_LINE + 1))
+    
+    # 2. Use awk to process the file with the known marker line number
+    awk -v marker="$MARKER_LINE" -v target="$TARGET_LINE" '
+    {
+        # Check for namespace
+        if (tolower($0) ~ /namespace/) {
+            print $0
+            next
+        }
+
+        # If this is the line AFTER the marker, keep it
+        if (NR == target) {
+            print $0
+            next
+        }
+
+        # Default: Comment the line
+        print "#" $0
+    }
+    ' "$selected_file" > "$temp_file"
+   fi
+fi
+
+
+    trap 'rm -f "$temp_file"' RETURN
+
+    "$EDITOR" "$temp_file"
+
+    if cmp -s "$selected_file" "$temp_file"; then
+        show_result "No Changes" "File was not modified."
+        return
+    fi
+
+    local save_name
+    if [[ "$DIALOG" == "dialog" ]]; then
+        save_name=$(dialog --stdout --title " Do you want to SAVE the Event Script " --inputbox "\nSave as filename:" 10 60 "$original_filename")
+    fi
+
+    [[ $? -eq 0 ]] || return
+
+    if [[ -z "$save_name" ]]; then
+        show_result "Error" "Filename cannot be empty."
+        return
+    fi
+
+    [[ "$save_name" != *.tcl ]] && save_name="${save_name}.tcl"
+    sudo mkdir -p "$MODULES_EVENTS_DIR/local" || {
+        show_result "Error" "Failed to create local events directory:\n${$MODULES_EVENTS_DIR/local}"
+        return
+    }
+
+    local local_file="$MODULES_EVENTS_DIR/local/$save_name"
+    if ! sudo cp -p "$temp_file" "$local_file"; then
+        show_result "Error" "Failed to save edited file to:\n${local_file}"
+        return
     fi
 }
 
