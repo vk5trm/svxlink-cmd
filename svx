@@ -625,46 +625,10 @@ action_edit_events() {
     temp_file=$(mktemp)
     chmod +r "$temp_file"
 
-if [[ "$selected_file" == "$EVENTS_DIR/local"/* ]]; then
-        cp "$selected_file" "$temp_file"
-    else
-# 1. Find the line number containing "End of namespace" (case insensitive)
-MARKER_LINE=$(grep -i "End of namespace" -n "$selected_file" | head -n 1 | cut -d: -f1)
-
-if [ -z "$MARKER_LINE" ]; then
-    echo "Warning: 'End of namespace' not found. Commenting everything except 'namespace' lines."
-    # Fallback to simple awk if marker is not found
-    awk '
-    /namespace/ { print; next }
-    { print "#" $0 }
-    ' "$selected_file" > "$temp_file"
-else
-    echo "Found marker at line: $MARKER_LINE"
-    TARGET_LINE=$((MARKER_LINE + 1))
-    
-    # 2. Use awk to process the file with the known marker line number
-    awk -v marker="$MARKER_LINE" -v target="$TARGET_LINE" '
-    {
-        # Check for namespace
-        if (tolower($0) ~ /namespace/) {
-            print $0
-            next
-        }
-
-        # If this is the line AFTER the marker, keep it
-        if (NR == target) {
-            print $0
-            next
-        }
-
-        # Default: Comment the line
-        print "#" $0
-    }
-    ' "$selected_file" > "$temp_file"
-   fi
-fi
-
-
+  if ! cp -p "$selected_file" "$temp_file"; then
+        show_result "Error" "Failed to prepare temporary file"
+        return
+    fi
     trap 'rm -f "$temp_file"' RETURN
 
     "$EDITOR" "$temp_file"
@@ -963,44 +927,10 @@ action_edit_module_event_files() {
     temp_file=$(mktemp)
     chmod +r "$temp_file"
 
-if [[ "$selected_file" == "$MODULES_EVENTS_DIR/local"/* ]]; then
-        cp "$selected_file" "$temp_file"
-    else
-# 1. Find the line number containing "End of namespace" (case insensitive)
-MARKER_LINE=$(grep -i "End of namespace" -n "$selected_file" | head -n 1 | cut -d: -f1)
-
-if [ -z "$MARKER_LINE" ]; then
-    echo "Warning: 'End of namespace' not found. Commenting everything except 'namespace' lines."
-    # Fallback to simple awk if marker is not found
-    awk '
-    /namespace/ { print; next }
-    { print "#" $0 }
-    ' "$selected_file" > "$temp_file"
-else
-    echo "Found marker at line: $MARKER_LINE"
-    TARGET_LINE=$((MARKER_LINE + 1))
-    
-    # 2. Use awk to process the file with the known marker line number
-    awk -v marker="$MARKER_LINE" -v target="$TARGET_LINE" '
-    {
-        # Check for namespace
-        if (tolower($0) ~ /namespace/) {
-            print $0
-            next
-        }
-
-        # If this is the line AFTER the marker, keep it
-        if (NR == target) {
-            print $0
-            next
-        }
-
-        # Default: Comment the line
-        print "#" $0
-    }
-    ' "$selected_file" > "$temp_file"
-   fi
-fi
+    if ! cp -p "$selected_file" "$temp_file"; then
+                show_result "Error" "Failed to prepare temporary file"
+                return
+                fi
 
 
     trap 'rm -f "$temp_file"' RETURN
