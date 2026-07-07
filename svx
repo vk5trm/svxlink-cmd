@@ -1333,7 +1333,7 @@ action_check_logrotate() {
 
     if sudo mv "$tmp_file" "$LOGROTATE_CONF"; then
         sudo chmod 644 "$LOGROTATE_CONF"
-        
+        sudo chown root:root "$LOGROTATE_CONF"
         # Clean up old specific configs if they exist (to avoid duplicates)
         sudo rm -f /etc/logrotate.d/svxreflector /etc/logrotate.d/remotetrx /etc/logrotate.d/svxlink 2>/dev/null
 
