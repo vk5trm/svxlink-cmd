@@ -409,49 +409,46 @@ action_status() {
 }
 
 # =============================================================================
-# NEW FUNCTION: View Log File (Tailbox - Scrollable & Live)
+# NEW FUNCTION: View Log File - Scrollable & Live)
 # =============================================================================
 
 action_logs() {
     pick_service "Select service to view logs for:" || return
     local svc="$PICKED_SERVICE"
     local logfile; logfile=$(resolve_logfile "$svc")
-    # Check if the log file exists
+
     if [[ ! -f "$logfile" ]]; then
         show_result "No Log File" "Log file not found:\n${logfile}\n\nThe service might be logging to journald only."
-         clear
-        echo "=== Following logs for ${SERVICE_LABELS[$svc]} (Ctrl+C to return) ==="
+        clear
+        echo "=== Following ${SERVICE_LABELS[$svc]} logs via journalctl (Ctrl+C to return) ==="
         echo ""
-        (
-        trap 'exit 0' INT
-        journalctl -u "${svc}.service" -f
-        )
+        ( trap 'exit 0' INT TERM; exec journalctl -u "${svc}.service" -f )
         return
     fi
 
-    # Check file size to prevent freezing on huge files
     local max_size_mb=50
     local file_size_kb
-    file_size_kb=$(du -k "$logfile" | cut -f1)
-    local file_size_mb=$((file_size_kb / 1024))
+    if ! file_size_kb=$(du -k -- "$logfile" 2>/dev/null | cut -f1); then
+        show_result "Error" "Could not read log file:\n${logfile}"
+        return
+    fi
+    local file_size_mb=$(( ${file_size_kb:-0} / 1024 ))
 
-    if [[ $file_size_mb -gt $max_size_mb ]]; then
+    if (( file_size_mb > max_size_mb )); then
+        local msg="The log file is too large (${file_size_mb}MB).\n\nUsing tail on large files may be slow.\n\nRecommend using SSH or 'Follow live logs'."
         if [[ "$DIALOG" == "dialog" ]]; then
-            dialog --colors --no-shadow --title "File Too Large" \
-                --msgbox "The log file is too large (${file_size_mb}MB).\n\nUsing tailbox on large files may be slow.\n\nRecommend using SSH or 'Follow live logs'." 12 60
+            dialog --colors --no-shadow --title "File Too Large" --msgbox "$msg" 12 60
         else
-            whiptail --title "File Too Large" \
-                --msgbox "The log file is too large (${file_size_mb}MB).\n\nUsing tailbox on large files may be slow.\n\nRecommend using SSH or 'Follow live logs'." 12 60
+            whiptail --title "File Too Large" --msgbox "$msg" 12 60
         fi
         return
     fi
 
-    # Display the log file in a tailbox (scrollable + live follow)
-    if [[ "$DIALOG" == "dialog" ]]; then
-        # Note: --tailbox requires the file to exist and be readable
-        dialog --colors --no-shadow --title " Log: ${logfile##*/} " \
-            --tailbox "$logfile" 40 100
-    fi
+    clear
+    echo "=== Following ${SERVICE_LABELS[$svc]} logs (${logfile##*/}) (Ctrl+C to return) ==="
+    echo ""
+    trap 'echo; echo "Returning to menu..."; return' INT TERM
+    tail -f -- "$logfile"
 }
 
 # =============================================================================
